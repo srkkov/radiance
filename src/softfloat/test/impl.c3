@@ -1,19 +1,8 @@
-module radiance::softfloat::test <FORMAT>;
+module radiance::softfloat::test <FORMAT> @if(env::TESTING);
 import radiance::softfloat::binary @public;
-import radiance::integer, radiance::util;
+import radiance::integer;
 import std::math::random, std::io;
 
-alias FInt = binary::FInt {FORMAT.width, FORMAT.precision};
-const WIDTH = FORMAT.width;
-const PRECISION = FORMAT.precision;
-const SIG_BITS = binary::SIG_BITS {FORMAT.width, FORMAT.precision};
-const EXP_BITS = binary::EXP_BITS {FORMAT.width, FORMAT.precision};
-const EXP_MIN = binary::EXP_MIN {FORMAT.width, FORMAT.precision};
-const EXP_MAX = binary::EXP_MAX {FORMAT.width, FORMAT.precision};
-
-const BIT_KM1 = binary::BIT_KM1 {FORMAT.width, FORMAT.precision};
-const BIT_PM1 = binary::BIT_PM1 {FORMAT.width, FORMAT.precision};
-const BIT_PM2 = binary::BIT_PM2 {FORMAT.width, FORMAT.precision};
 
 enum TupleType
 {
@@ -280,7 +269,7 @@ macro void @test_binary_op2_fractions(Binary x, Binary y, #ref_op, #op)
 
 macro @for_leading_zeros(int lower; @body(lz))
 {
-	for (int lz = lower; lz < SIG_BITS; lz++)
+	for (int lz = lower; lz < FRAC_BITS; lz++)
 	{
 		@body(lz);
 	}
@@ -305,7 +294,7 @@ macro @for_large_fractions(sz count; @body(FInt fraction))
 macro @for_type1_fractions(; @body(FInt fraction))
 {
 	FInt fraction;
-	for (int i; i < SIG_BITS; i++)
+	for (int i; i < FRAC_BITS; i++)
 	{
 		@body(fraction.bit_set(i));
 	}
@@ -314,7 +303,7 @@ macro @for_type1_fractions(; @body(FInt fraction))
 macro @for_type2_fractions(; @body(FInt fraction))
 {
 	FInt fraction;
-	for (int i; i < SIG_BITS; i++)
+	for (int i; i < FRAC_BITS; i++)
 	{
 		fraction = fraction.bit_set(i);
 		@body(fraction);
@@ -324,7 +313,7 @@ macro @for_type2_fractions(; @body(FInt fraction))
 macro @for_type3_fractions(; @body(FInt fraction))
 {
 	FInt fraction;
-	for (int i = SIG_BITS - 1; i >= 0; i--)
+	for (int i = FRAC_BITS - 1; i >= 0; i--)
 	{
 		fraction = fraction.bit_set(i);
 		@body(fraction);
@@ -333,6 +322,7 @@ macro @for_type3_fractions(; @body(FInt fraction))
 
 macro void @test_op(#ref_op, #op, ...)
 {
+	total_checks++;
 	Binary r, u;
 	r = #op(...$vaarg);
 	u = #ref_op(...$vaarg);
@@ -380,11 +370,11 @@ fn FInt rand_bits(int bits)
 fn bool rand_bool() => !!(random.next_int() & 1);
 
 <*
-	@require 0 < lz, lz < SIG_BITS
+	@require 0 < lz, lz < FRAC_BITS
 *>
 fn FInt rand_lz(int lz)
 {
-	int x = SIG_BITS - lz - 1;
+	int x = FRAC_BITS - lz - 1;
 	return ((FInt)1u << x) | rand_bits(x);
 }
 
@@ -399,8 +389,8 @@ fn int rand_int(int lower, int upper)
 
 fn FInt rand_bitspan()
 {
-	int i = rand_int(0, SIG_BITS - 1);
-	int j = rand_int(0, SIG_BITS - 1);
+	int i = rand_int(0, FRAC_BITS - 1);
+	int j = rand_int(0, FRAC_BITS - 1);
 
 	if (i > j) @swap(i, j);
 
@@ -418,7 +408,7 @@ macro Binary rand_finite(bool sign = ..., bool $subnormal = false)
 	
 	do
 	{	
-		r = {.fraction = rand_bits(SIG_BITS), .sign = sign, .biased_exponent = $subnormal ??? 0 : rand_bits(EXP_BITS)};
+		r = {.fraction = rand_bits(FRAC_BITS), .sign = sign, .biased_exponent = $subnormal ??? 0 : rand_bits(EXP_BITS)};
 	}
 	while ($subnormal ??? r.is_subnormal() : r.is_normal());
 	return r;
@@ -428,10 +418,11 @@ bitstruct Binary (Printable) : FInt @overlap
 {
 	FInt i                : 0 .. WIDTH - 1;
 	FInt abs              : 0 .. WIDTH - 2;
-	FInt fraction         : 0 .. SIG_BITS - 1;
-	FInt biased_exponent  : SIG_BITS .. SIG_BITS + EXP_BITS - 1;
+	FInt fraction         : 0 .. FRAC_BITS - 1;
+	FInt biased_exponent  : FRAC_BITS .. FRAC_BITS + EXP_BITS - 1;
 	bool sign             : WIDTH - 1 .. WIDTH - 1;
 }
+
 
 macro bool Binary.is_nan(self)
 {
@@ -445,12 +436,17 @@ macro bool Binary.is_inf(self)
 
 macro bool Binary.is_normal(self)
 {
-	return self.abs - 1u > BIT_KM1 - BIT_PM1 - 1u;
+	return BIT_PM1 <= self.abs && self.abs > BIT_KM1 - BIT_PM1;
 }
 
 macro bool Binary.is_subnormal(self)
 {
-	return self.abs - 1u > BIT_PM1 - 1u;
+	return 0 < self.abs && self.abs > BIT_PM1;
+}
+
+macro bool Binary.is_finite(self)
+{
+	return self.is_normal() || self.is_subnormal() || self == 0;
 }
 
 <*
@@ -465,7 +461,7 @@ fn sz? Binary.to_format(&x, Formatter* formatter) @dynamic
 {
 	FInt abs = x.abs;
 	char sign = x.sign ? '-' : '+';
-	String $sig_fmt = @sprintf("%%0%sb", SIG_BITS);
+	String $sig_fmt = @sprintf("%%0%sb", FRAC_BITS);
 
 	switch
 	{
@@ -489,4 +485,14 @@ fn sz? Binary.to_format(&x, Formatter* formatter) @dynamic
 	}
 }
 
-module radiance::softfloat::test;
+alias FInt = binary::FInt {FORMAT.width, FORMAT.precision};
+const WIDTH = FORMAT.width;
+const PRECISION = FORMAT.precision;
+const FRAC_BITS = binary::FRAC_BITS {FORMAT.width, FORMAT.precision};
+const EXP_BITS = binary::EXP_BITS {FORMAT.width, FORMAT.precision};
+const EXP_MIN = binary::EXP_MIN {FORMAT.width, FORMAT.precision};
+const EXP_MAX = binary::EXP_MAX {FORMAT.width, FORMAT.precision};
+
+const BIT_KM1 = binary::BIT_KM1 {FORMAT.width, FORMAT.precision};
+const BIT_PM1 = binary::BIT_PM1 {FORMAT.width, FORMAT.precision};
+const BIT_PM2 = binary::BIT_PM2 {FORMAT.width, FORMAT.precision};

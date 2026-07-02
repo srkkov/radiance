@@ -7,7 +7,7 @@ module radiance::integer;
 	@require $width > 0, $begin >= 0
 	@require $begin + $width <= bitsize($IntType)
 *>
-macro const_bitmask($IntType, uint $width, uint $begin = 0) @const
+macro const_bitmask($IntType, int $width, int $begin = 0) @const
 {
 	$IntType $mask = ~($IntType)0 >> (bitsize($IntType) - $width);
 	return $mask << $begin;
@@ -118,7 +118,7 @@ macro bit_toggle(x, int index)
 
 <*
 	@require is_unsigned($Typeof(x))
-	@require 0 <= width, width <= bitsize($Typeof(x))
+	@require !$defined(width) ||| (0 <= width && width <= bitsize($Typeof(x)))
 	@ensure return == 0 || return == 1
 *>
 macro bit_or(x, int width = ...)
@@ -159,12 +159,12 @@ const String METHODS @local = `
 macro %0 %0.deposit(self, %0 value, int begin, int width) => bit_deposit(self, value, begin, width);
 macro %0 %0.extract(self, int begin, int width) => bit_extract(self, begin, width);
 macro %0 %0.truncate(self, int width) => bit_extract(self, 0, width);
-macro %0 %0.lo(self) => bit_extract(self, 0, (bitsize(%0) / 2) - 1);
-macro %0 %0.hi(self) => bit_extract(self, bitsize(%0) / 2, bitsize(%0) - 1);
+macro %0 %0.lo(self) => bit_extract(self, 0, bitsize(%0) / 2);
+macro %0 %0.hi(self) => bit_extract(self, bitsize(%0) / 2, bitsize(%0) / 2);
 macro %0 %0.bit(self, int index) => bit_get(self, index);
 macro %0 %0.lsb(self) => bit_get(self, 0);
-macro %0 %0.msb(self) => bit_get(self, bitsize(%0) - 1);
-macro %0 %0.bit_or(self, int width = ...) => bit_or(self, width);
+macro %0 %0.msb(self) => self >> (bitsize(%0) - 1);
+macro %0 %0.bit_or(self, int width = ...) => $defined(width) ??? bit_or(self, width) : bit_or(self);
 macro %0 %0.bit_set(self, int index) => bit_set(self, index);
 macro %0 %0.bit_toggle(self, int index) => bit_toggle(self, index);
 macro int %0.popcnt(self) => popcnt(self); 

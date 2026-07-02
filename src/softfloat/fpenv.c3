@@ -1,13 +1,17 @@
 module radiance::softfloat;
 
+// Interface fpenv
+// fn void subnormal_inputs_enabled()
+// fn void subnormal_outputs_enabled()
+
 struct SoftFloatEnv
 {
 	SoftFloatExceptionMask  flags; 
 	SoftFloatExceptionMask  exceptions;
+	RadianceRoundingMode    rounding_mode;
 	bool                    flush_subnormal_inputs;
 	bool                    flush_subnormal_outputs;
 	bool                    underflow_after_rounding;
-	RadianceRoundingMode    rounding_mode;
 }
 
 enum SoftFloatException : char
@@ -77,6 +81,7 @@ bitstruct SoftFloatExceptionMask : char
 
 alias SoftFloatExceptionHandler = fn void(SoftFloatExceptionMask);
 
+
 fn bool SoftFloatExceptionMask.test(self, SoftFloatExceptionMask flags)
 {
 	return !!(self & flags);
@@ -104,7 +109,7 @@ fn void SoftFloatEnv.lower_flags(&self, SoftFloatExceptionMask flags)
 
 fn bool SoftFloatEnv.test_flags(&self, SoftFloatExceptionMask flags)
 {
-	return self.test(flags);
+	return self.flags.test(flags);
 }
 
 

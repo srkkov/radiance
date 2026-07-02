@@ -1,11 +1,13 @@
 module radiance::integer;
 import std::math;
+// From std::math
+//  overflow_add
+//  overflow_sub
+//  overflow_mul
 
 <*
-	@require is_int($Typeof(value))
-	@require is_int($Typeof(lower))
-	@require is_int($Typeof(upper))
-	@require lower >= 0, upper >= lower
+ @require @is_int(value, lower, upper)
+ @require lower >= 0, upper >= lower
 *>
 macro bool in_range_abs(value, lower, upper)
 {
@@ -14,51 +16,82 @@ macro bool in_range_abs(value, lower, upper)
 }
 
 <*
-	@require x != $reflect(value).max
+ @require @is_int(x)
+ @require x != $reflect(value).max
 *>
 macro abs(x)
 {
 	return x < 0 ? -x : x;
 }
 
-// macro max(x, y) => std::math::max(x, y);
-// macro min(x, y) => std::math::min(x, y);
-
 <*
-	@require is_int($Typeof(x))
-	@require $Typeof(x) == $Typeof(y) : "Operands must be the same type."
+ @require @is_int(x, y) : "Operands must be integers."
+ @require @type_match(x, y) : "Operands must be the same type."
 *>
-macro max(x, y)
+macro max2(x, y)
 {
 	return x > y ? x : y;
 }
 
 <*
-	@require is_int($Typeof(x)) : "Operands must be integers"
-	@require $Typeof(x) == $Typeof(y) : "Operands must be the same type."
+ @require @is_int(x, y) : "Operands must be integers."
+ @require @type_match(x, y) : "Operands must be the same type."
 *>
-macro min(x, y)
+macro min2(x, y)
 {
 	return x < y ? x : y;
 }
 
 <*
-	@require is_int($Typeof(x)) : "Operands must be integers"
-	@require $Typeof(x) == $Typeof(y) : "Operands must be the same type."
+ @require $vaarg.len > 0 : "There must be at least 1 operand."
+ @require @is_int(...$vaarg) : "Operands must be integers."
+ @require @type_match(...$vaarg) : "Operands must be the same type."
 *>
-macro diff(x, y)
+macro max(...)
 {
-	return max(x,y) - min(x,y);
+	$switch $vaarg.len:
+		$case 1:
+			return $vaarg[0];
+		$case 2:
+			return max2($vaarg[0], $vaarg[1]);
+		$default:
+			return max2($vaarg[0], max(...$vaarg[1..]));
+	$endswitch
 }
 
 <*
-	@require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
-	@require $Typeof(a) == $Typeof(b) : "Operands must be the same type."
-	@require $Typeof(*carry) == $Typeof(a) : "Outputs must be pointers of the operand type."
-	@param[&out] carry
-	@ensure *carry <= 1
+ @require $vaarg.len > 0 : "There must be at least 1 operand."
+ @require @is_int(...$vaarg) : "Operands must be integers."
+ @require @type_match(...$vaarg) : "Operands must be the same type."
 *>
-macro uadd(carry, a, b)
+macro min(...)
+{
+	$switch $vaarg.len:
+		$case 1:
+			return $vaarg[0];
+		$case 2:
+			return min2($vaarg[0], $vaarg[1]);
+		$default:
+			return min2($vaarg[0], min(...$vaarg[1..]));
+	$endswitch
+}
+
+<*
+ @require @is_int(x) : "Operands must be integers"
+ @require @type_match(x, y) : "Operands must be the same type."
+*>
+macro diff(x, y)
+{
+	return max(x, y) - min(x, y);
+}
+
+<*
+ @require @is_unsigned(y) : "Operands must be unsigned integers."
+ @require @type_match(x, y, *carry) : "Operands and output must be the same type."
+ @param[&out] carry
+ @ensure *carry <= 1
+*>
+macro uadd(carry, x, y)
 {
 	var $Int = $Typeof(a); 
 	$Int r;
@@ -67,12 +100,12 @@ macro uadd(carry, a, b)
 }
 
 <*
-	@require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
-	@require $Typeof(b) == $Typeof(a) : "Operands must be the same type."
-	@require $Typeof(carry_in) == $Typeof(a) : "Operands must be the same type."
-	@require $Typeof(*carry) == $Typeof(a) : "Outputs must be pointers of the operand type."
-	@param[&out] carry
-	@ensure *carry <= 1
+ @require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
+ @require $Typeof(b) == $Typeof(a) : "Operands must be the same type."
+ @require $Typeof(carry_in) == $Typeof(a) : "Operands must be the same type."
+ @require $Typeof(*carry) == $Typeof(a) : "Outputs must be pointers of the operand type."
+ @param[&out] carry
+ @ensure *carry <= 1
 *>
 macro uadc(carry, a, b, carry_in)
 {
@@ -85,11 +118,11 @@ macro uadc(carry, a, b, carry_in)
 }
 
 <*
-	@require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
-	@require $Typeof(a) == $Typeof(b) : "Operands must be the same type."
-	@require $Typeof(*barrow) == $Typeof(a) : "Outputs must be pointers of the operand type."
-	@param[&out] barrow
-	@ensure *barrow <= 1
+ @require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
+ @require $Typeof(a) == $Typeof(b) : "Operands must be the same type."
+ @require $Typeof(*barrow) == $Typeof(a) : "Outputs must be pointers of the operand type."
+ @param[&out] barrow
+ @ensure *barrow <= 1
 *>
 macro usub(barrow, a, b)
 {
@@ -100,12 +133,12 @@ macro usub(barrow, a, b)
 }
 
 <*
-	@require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
-	@require $Typeof(b) == $Typeof(a) : "Operands must be the same type."
-	@require $Typeof(barrow_in) == $Typeof(a) : "Operands must be the same type."
-	@require $Typeof(*barrow) == $Typeof(a) : "Outputs must be pointers of the operand type."
-	@param[&out] barrow
-	@ensure *barrow <= 1
+ @require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
+ @require $Typeof(b) == $Typeof(a) : "Operands must be the same type."
+ @require $Typeof(barrow_in) == $Typeof(a) : "Operands must be the same type."
+ @require $Typeof(*barrow) == $Typeof(a) : "Outputs must be pointers of the operand type."
+ @param[&out] barrow
+ @ensure *barrow <= 1
 *>
 macro usbb(barrow, a, b, barrow_in)
 {
@@ -118,9 +151,9 @@ macro usbb(barrow, a, b, barrow_in)
 }
 
 <*
-	@require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
-	@require $Typeof(a) == $Typeof(b) : "Operands must be the same type."    
-	@ensure return < $Typeof(a).max - 1
+ @require is_unsigned($Typeof(a)) : "Operands must be unsigned integers."
+ @require $Typeof(a) == $Typeof(b) : "Operands must be the same type."    
+ @ensure return < $Typeof(a).max - 1
 *>
 macro umulhi(a, b)
 {
@@ -130,18 +163,19 @@ macro umulhi(a, b)
 }
 
 <*
-	@require $Typeof(b) == $Typeof(b) : "Operands must be the same type."
-	@require has_doublewidth_type($Typeof(a)) : "Operand type must have a doublewidth equivalent."
-	@require $Typeof(*prod_hi) == $Typeof(a) || $Typeof(*prod_hi) == doublewidth_type($Typeof(a)) : "Output type must fit result."
-	@param[out] prod_hi
-	@ensure *prod_hi < $reflect(a).max - 1
+ @require $Typeof(b) == $Typeof(b) : "Operands must be the same type."
+ @require has_doublewidth_type($Typeof(a)) : "Operand type must have a doublewidth equivalent."
+ @require $Typeof(*prod_hi) == $Typeof(a)  : "Output type must fit result."
+ @param[out] prod_hi
+ @ensure *prod_hi < $reflect(a).max - 1
 *>
-macro umul(prod_hi, a, b)
+macro mul(prod_hi, a, b)
 {
+	var $Integer = $Typeof(a);
 	var $DInteger = doublewidth_type($Typeof(a));
 	$DInteger p = ($DInteger)a * ($DInteger)b;
-	*prod_hi = ($Typeof(*prod_hi))(p.hi());
-	return p.lo();
+	*prod_hi = ($Integer)p.hi();
+	return ($Integer)p.lo();
 }
 
 
@@ -151,6 +185,56 @@ macro umul(prod_hi, a, b)
 
 
 
+
+
+<*
+ @require @is_int(x, min, max) : "Operands must be integers."
+ @require @type_match(x, min, max) : "Operands must be the same type."
+*>
+macro clamp(x, min, max)
+{
+	return min2(max2(x, min), max);
+}
+
+
+
+// ---Saturating Arithmetic---
+
+<*
+ @require @is_int(x, y) : "Operands must be integers."
+ @require @type_match(x, y) : "Operands must be the same type."
+*>
+macro sat_add(x, y)
+{
+	return x.sat_add(y);
+}
+
+<*
+ @require @is_int(x, y) : "Operands must be integers."
+ @require @type_match(x, y) : "Operands must be the same type."
+*>
+macro sat_sub(x, y)
+{
+	return x.sat_sub(y);
+}
+
+<*
+ @require @is_int(x, y) : "Operands must be integers."
+ @require @type_match(x, y) : "Operands must be the same type."
+*>
+macro sat_mul(x, y)
+{
+	return x.sat_mul(y);
+}
+
+<*
+ @require is_int($Type) : "The type to be saturated to must be an integer type."
+ @require @is_int(x) : "The value to be saturated must be an integer."
+*>
+macro saturating_cast($Type, x)
+{
+	return clamp(x, $Type::min, $Type::max);
+}
 
 
 

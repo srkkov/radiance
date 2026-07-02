@@ -1,4 +1,12 @@
-module radiance::util;
+module std::core::radiance;
+import std::io;
+
+macro void dump(...) @builtin
+{
+	$for sz $i; $i < $vaarg.len; $i++:
+		io::printfn($stringify($vaarg[$i]) +++ ": %s", $vaarg[$i]);
+	$endfor
+}
 
 macro @unpredictable(bool #expr) @builtin
 {
@@ -21,13 +29,3 @@ macro @const_for(sz $count; @body(sz $i)) @builtin
 	$endfor
 }
 
-macro @sqfor (sz lower, sz upper; @body(i, j))
-{
-	for (sz i = lower; i <= upper; i++)
-	{
-		for (sz j = lower; j <= upper; j++)
-		{
-			@body(i, j);
-		}
-	}
-}

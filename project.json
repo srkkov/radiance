@@ -1,40 +1,46 @@
 {
-    "debug-info": "full",
-    "cpu": "native",
-    "single-module": true,
-    "x86cpu": "native",
-    "x86vec": "default",
-    "fp-math": "strict",
-    "sanitize": "none",
+	"debug-info": "full",
+	"cpu": "native",
+	"single-module": true,
+	"x86cpu": "native",
+	"x86vec": "default",
+	"fp-math": "strict",
+	"sanitize": "none",
 
-    "test-sources": [ 
-		"src/softfloat/test/*" 
-	],
-
-    "sources": [ 
-		"main.c3",
+	"sources": [ 
 		"src/util.c3",
 		"src/env.c3",
 		"src/rounding.c3",
 		"src/integer/*",
-		"src/softfloat/**"
+		"src/softfloat/*",
 	],
 
-    "targets": {
-        "main": {
-            "type": "executable",
-            "opt": "O0",
-            "safe": true
-        },
-        "fast": {
-            "type": "executable",
-            "unroll-loops" : true,   
-            "loop-vectorize" : true, 
-            "slp-vectorize" : true,  
-            "merge-functions" : true,
-            "optlevel": "max",
-            "safe": false
-        }
-    }
+	"targets": {
+		"main": {
+			"sources": [ "main.c3" ],
+			"type": "executable",
+			"opt": "O0",
+			"safe": true
+		},
+
+		"fast": {
+			"sources": [ "main.c3" ],
+			"type": "executable",
+			"unroll-loops" : true,   
+			"loop-vectorize" : true, 
+			"slp-vectorize" : true,  
+			"merge-functions" : true,
+			"optlevel": "max",
+			"safe": false
+		},
+
+		"test-emulated-fp": {
+			"type": "test",
+			"sources": [ "src/softfloat/*" ],
+			"test-sources": [ "src/softfloat/test/*" ],
+			"dependency-search-paths": [ "test/lib/" ],
+			"dependencies": [ "gmp", "mpfr" ]
+		}
+	}
 }
 
