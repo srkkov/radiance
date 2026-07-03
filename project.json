@@ -12,7 +12,7 @@
 		"src/env.c3",
 		"src/rounding.c3",
 		"src/integer/*",
-		"src/softfloat/*",
+		"src/softfloat/*"
 	],
 
 	"targets": {
@@ -34,7 +34,7 @@
 			"safe": false
 		},
 
-		"test-emulated-fp": {
+		"softfloat": {
 			"type": "test",
 			"sources": [ "src/softfloat/*" ],
 			"test-sources": [ "src/softfloat/test/*" ],

@@ -1,182 +1,217 @@
-module radiance::softfloat::test <FORMAT> @if(env::TESTING);
+module radiance::softfloat::test <WIDTH, PRECISION> @if(env::TESTING);
 import radiance::softfloat::binary @public;
 import radiance::integer;
 import std::math::random, std::io;
 
 
-enum TupleType
-{
-	NORMAL, SUBNORMAL, MIXED
-}
-
-macro void @test_binary_addition_special_rn(#op)
-{	
-	const Binary P_ZERO = {};
-	const Binary N_ZERO = {.sign = true};
-	const Binary P_INF = {.abs = INF};
-	const Binary N_INF = {.abs = INF, .sign = true};
-
-	Binary pfinite = rand_finite(false);
-	Binary nfinite = rand_finite(true);
-
-	// addition
-	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
-	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
-	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
-	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
-
-	// subtraction
-	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
-	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
-	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
-	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
-
-	assert(#op(P_ZERO, pfinite).is_finite());
-	assert(#op(N_ZERO, nfinite).is_finite());
-
-	assert(#op(P_INF, pfinite).is_finite());
-	assert(#op(N_INF, nfinite).is_finite());
-
-	assert(#op(P_INF, P_INF) == P_INF);
-	assert(#op(N_INF, N_INF) == N_INF);
-
-	assert(@op(QNAN, pfinite).is_nan());
-	assert(@op(QNAN, nfinite).is_nan());
-
-	assert(@op(pfinite, QNAN).is_nan());
-	assert(@op(nfinite, QNAN).is_nan());
-
-	assert(@op(QNAN, QNAN).is_nan());
-	assert(@op(QNAN, QNAN).is_nan());
-}
-
-macro void @test_binary_subtraction_special_rn(#op)
-{	
-	const Binary P_ZERO = {};
-	const Binary N_ZERO = {.sign = true};
-	const Binary P_INF = {.abs = INF};
-	const Binary N_INF = {.abs = INF, .sign = true};
-
-	Binary pfinite = rand_finite(false);
-	Binary nfinite = rand_finite(true);
-
-	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
-	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
-	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
-	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
-
-	assert(#op(P_ZERO, pfinite).is_finite());
-	assert(#op(N_ZERO, nfinite).is_finite());
-
-	assert(#op(P_INF, pfinite).is_finite());
-	assert(#op(N_INF, nfinite).is_finite());
-
-	assert(#op(P_INF, P_INF) == P_INF);
-	assert(#op(N_INF, N_INF) == N_INF);
-}
-
-// macro void test_binary_addition_special_rn_rz_ru(#op)
-// {
-// 	test_op2_zero_behavior(#op, 1, 1, 1, 0);
-// 	test_op2_inf_behavior(#op, 1, 1, 1, 1);
+// macro void @test_binary_addition_special_rn(#op)
+// {	
+// 	const _Binary P_ZERO = {};
+// 	const _Binary N_ZERO = {.sign = true};
+// 	const _Binary P_INF = {.abs = INF};
+// 	const _Binary N_INF = {.abs = INF, .sign = true};
+//
+// 	_Binary pfinite = rand_finite(false);
+// 	_Binary nfinite = rand_finite(true);
+//
+// 	// addition
+// 	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
+// 	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
+// 	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
+// 	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
+//
+// 	// subtraction
+// 	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
+// 	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
+// 	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
+// 	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
+//
+// 	assert(#op(P_ZERO, pfinite).is_finite());
+// 	assert(#op(N_ZERO, nfinite).is_finite());
+//
+// 	assert(#op(P_INF, pfinite).is_finite());
+// 	assert(#op(N_INF, nfinite).is_finite());
+//
+// 	assert(#op(P_INF, P_INF) == P_INF);
+// 	assert(#op(N_INF, N_INF) == N_INF);
+//
+// 	assert(@op(QNAN, pfinite).is_nan());
+// 	assert(@op(QNAN, nfinite).is_nan());
+//
+// 	assert(@op(pfinite, QNAN).is_nan());
+// 	assert(@op(nfinite, QNAN).is_nan());
+//
+// 	assert(@op(QNAN, QNAN).is_nan());
+// 	assert(@op(QNAN, QNAN).is_nan());
+// }
+//
+// macro void @test_binary_subtraction_special_rn(#op)
+// {	
+// 	const _Binary P_ZERO = {};
+// 	const _Binary N_ZERO = {.sign = true};
+// 	const _Binary P_INF = {.abs = INF};
+// 	const _Binary N_INF = {.abs = INF, .sign = true};
+//
+// 	_Binary pfinite = rand_finite(false);
+// 	_Binary nfinite = rand_finite(true);
+//
+// 	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
+// 	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
+// 	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
+// 	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
+//
+// 	assert(#op(P_ZERO, pfinite).is_finite());
+// 	assert(#op(N_ZERO, nfinite).is_finite());
+//
+// 	assert(#op(P_INF, pfinite).is_finite());
+// 	assert(#op(N_INF, nfinite).is_finite());
+//
+// 	assert(#op(P_INF, P_INF) == P_INF);
+// 	assert(#op(N_INF, N_INF) == N_INF);
 // }
 
-
-// exp_diff = 0,1
-macro void @test_binary_addition_normal_close_case(#ref_op, #op, bool $different_signs)
+<*
+ Tests 2 operands that have an exponent difference equal to `0` or `1`.
+ Mainly used for addition/subtraction testing.
+*>
+macro void @test_add_normal_close_case(#ref_op, #op, bool $different_signs)
 {
-	Binary x, y;
+	_Binary x, y;
 	for (int i; i < 2; i++)
 	{
-		@repeat(LONG_TEST ??? 0x2000 : 0x100)
+		@repeat(LONG_TEST ??? 40_000 : 800)
 		{
 			int ex, ey; rand_exponents_from_diff(i, &ex, &ey);
 			x.set_exponent(ex);
 			y.set_exponent(ey);
 
-			@random_sign_pair(x, y, $different_signs);
+			random_sign_pair(&x, &y, $different_signs);
 
-			@test_binary_op2_fractions(x, y, #ref_op, #op);
+			@test_op2_fractions(x, y, #ref_op, #op);
 		};
 	}
 }
 
-// exp_diff = 2 .. PRECISION
-macro void @test_binary_addition_normal_far_case_1(#ref_op, #op, bool $different_signs)
+<*
+ Tests 2 operands that have an exponent difference equal between `2` and `PRECISION`.
+ Mainly used for addition/subtraction testing.
+*>
+macro void @test_add_normal_far_case_1(#ref_op, #op, bool $different_signs)
 {
-	Binary x, y;
+	_Binary x, y;
 	for (int i = 2; i <= PRECISION; i++)
 	{
-		@repeat(LONG_TEST ??? 0x800 : 0x80)
+		@repeat(LONG_TEST ??? 20_000 : 400)
 		{
 			int ex, ey; rand_exponents_from_diff(i, &ex, &ey);
 			x.set_exponent(ex);
 			y.set_exponent(ey);
 
-			@random_sign_pair(x, y, $different_signs);
+			random_sign_pair(&x, &y, $different_signs);
 
-			@test_binary_op2_fractions(x, y, #ref_op, #op);
+			@test_op2_fractions(x, y, #ref_op, #op);
 		};
 	}
 }
 
-// exp_diff = PRECISION + 1 ..
-macro void @test_binary_addition_normal_far_case_2(#ref_op, #op, bool $different_signs)
+<*
+ Tests 2 operands that have an exponent difference higher than `PRECISION`.
+ Mainly used for addition/subtraction testing.
+*>
+macro void @test_add_normal_far_case_2(#ref_op, #op, bool $different_signs)
 {
-	Binary x, y;
-	for (int i = PRECISION + 1; i <= EXP_MAX - EXP_MIN; i++)
+	_Binary x, y;
+	int ex, ey;
+	for (int exp_diff = PRECISION + 1; exp_diff <= EXP_MAX - EXP_MIN; exp_diff++)
 	{
-		@repeat(LONG_TEST ??? 0x80 : 0x10)
+		@repeat(LONG_TEST ??? 10_000 : 100)
 		{
-			int ex, ey; rand_exponents_from_diff(i, &ex, &ey);
+			rand_exponents_from_diff(exp_diff, &ex, &ey);
 			x.set_exponent(ex);
 			y.set_exponent(ey);
 
-			@random_sign_pair(x, y, $different_signs);
+			random_sign_pair(&x, &y, $different_signs);
 
-			@test_binary_op2_fractions(x, y, #ref_op, #op);
+			@test_op2_fractions(x, y, #ref_op, #op);
 		};
 	}
 }
 
-macro void @test_binary_op2_subnormal(#ref_op, #op, bool $different_signs = ...)
+<*
+ Tests some subnormal operands pairs, exluding the sign.
+*>
+macro void @test_op2_subnormal(#ref_op, #op, bool $different_signs = ...)
 {
-	Binary x, y;
-	@repeat(LONG_TEST ??? 0x1000 : 0x100)
-	{
-		@random_sign_pair(x, y, $different_signs);
+	_Binary x, y;
 
-		@test_binary_op2_fractions(x, y, #ref_op, #op);
-	};
-
-}
-
-macro void @test_binary_op2_mixed(#ref_op, #op, bool $different_signs = ...)
-{	
-	Binary x, y;
-
-	@const_for(2; $i)
-	{
-		@repeat(LONG_TEST ??? 0x4000 : 0x1000)
-		{
-			x.set_exponent(rand_int(EXP_MIN, $i ??? EXP_MAX : EXP_MIN + PRECISION + 1));
-
-			if (rand_bool()) @swap(x, y);
-
-			@random_sign_pair(x, y, $different_signs);
-
-			@test_binary_op2_fractions(x, y, #ref_op, #op);
-		};
-	};
-}
-
-macro @random_sign_pair(Binary #x, Binary #y, $different_signs = ...)
-{
-	#x.sign = rand_bool();
 	$if $defined($different_signs):
-		#y.sign = $different_signs ??? !#x.sign : #x.sign;
+		$if $different_signs:
+			x.sign = true;
+			@test_op2_fractions(x, y, #ref_op, #op);
+			x.sign = false; y.sign = true;
+			@test_op2_fractions(x, y, #ref_op, #op);
+		$else
+			@test_op2_fractions(x, y, #ref_op, #op);
+			x.sign = true; y.sign = true;
+			@test_op2_fractions(x, y, #ref_op, #op);
+		$endif
 	$else
-		#y.sign = rand_bool();
+		@test_op2_fractions(x, y, #ref_op, #op);
+		y.sign = true;
+		@test_op2_fractions(x, y, #ref_op, #op);
+		x.sign = true; y.sign = false;
+		@test_op2_fractions(x, y, #ref_op, #op);
+		y.sign = true;
+		@test_op2_fractions(x, y, #ref_op, #op);
+	$endif
+}
+
+<*
+ Tests all subnormal operands pairs, exluding the sign.
+*>
+macro void @test_op2_all_subnormals(#ref_op, #op)
+{
+	_Binary x, y;
+	for (FInt i; i < FRAC_BITS; i++)
+	{
+		x.fraction = i;
+		for (FInt j; j < FRAC_BITS; j++)
+		{	
+			y.fraction = j;
+			@test_op(#ref_op, #op, x, y);
+		}
+	}
+}
+
+<*
+ Tests 2 operands, one subnormal operand, and one normal operand. First we test 
+ all normal exponents, then we test exponents near EXP_MIN.
+*>
+macro void @test_op2_mixed(#ref_op, #op, bool $different_signs = ...)
+{	
+	_Binary x, y;
+	foreach (int emax : {EXP_MAX, EXP_MIN + PRECISION + 1})
+	{
+		@repeat(LONG_TEST ??? 400_000 : 8_000)
+		{
+			x.set_exponent(rand_int(EXP_MIN, emax));
+
+			@rand_swap(x, y);
+
+			random_sign_pair(&x, &y, $different_signs);
+
+			@test_op2_fractions(x, y, #ref_op, #op);
+		};
+	}
+}
+
+macro random_sign_pair(_Binary* x, _Binary* y, $different_signs = ...)
+{
+	x.sign = rand_bool();
+	$if $defined($different_signs):
+		y.sign = $different_signs ??? !x.sign : x.sign;
+	$else
+		y.sign = rand_bool();
 	$endif
 }
 
@@ -190,7 +225,7 @@ fn void rand_exponents_from_diff(int exp_diff, int* out_ex, int* out_ey)
 	*out_ey = ey;
 }
 
-macro void @test_binary_op2_fractions(Binary x, Binary y, #ref_op, #op)
+macro void @test_op2_fractions(_Binary x, _Binary y, #ref_op, #op)
 {
 	@for_type1_fractions(; FInt mx)
 	{
@@ -265,6 +300,14 @@ macro void @test_binary_op2_fractions(Binary x, Binary y, #ref_op, #op)
 
 		@test_op(#ref_op, #op, x, y);
 	};
+
+	@repeat(512)
+	{
+		x.fraction = rand_bitspan();
+		y.fraction = rand_bitspan();
+
+		@test_op(#ref_op, #op, x, y);
+	};
 }
 
 macro @for_leading_zeros(int lower; @body(lz))
@@ -323,7 +366,7 @@ macro @for_type3_fractions(; @body(FInt fraction))
 macro void @test_op(#ref_op, #op, ...)
 {
 	total_checks++;
-	Binary r, u;
+	_Binary r, u;
 	r = #op(...$vaarg);
 	u = #ref_op(...$vaarg);
 	if (r != u)
@@ -337,84 +380,7 @@ macro void @test_op(#ref_op, #op, ...)
 	}
 }
 
-Msws64Random random;
-
-fn void init_random() @init => random.set_seed({1, 2, 3, 4});
-
-<*
-	@require 0 <= bits, bits <= WIDTH
-*>
-fn FInt rand_bits(int bits)
-{
-	int s = WIDTH - bits;
-	FInt r;
-
-	if (!bits) return 0;
-	$switch WIDTH:
-		$case 16:
-			r = random.next_short();
-		$case 32:
-			r = random.next_int();
-		$case 64:
-			r = random.next_long();
-		$case 128:
-			r = random.next_long();
-			r <<= 64;
-			r |= random.next_long();
-		$default:
-			$error("Awwwww");
-	$endswitch
-	return (r << s) >> s;
-}
-
-fn bool rand_bool() => !!(random.next_int() & 1);
-
-<*
-	@require 0 < lz, lz < FRAC_BITS
-*>
-fn FInt rand_lz(int lz)
-{
-	int x = FRAC_BITS - lz - 1;
-	return ((FInt)1u << x) | rand_bits(x);
-}
-
-<*
-	@require upper >= lower
-*>
-fn int rand_int(int lower, int upper)
-{
-	uint range = (uint)(upper - lower + 1);
-	return lower + (int)((uint)random.next_int() % range);
-}
-
-fn FInt rand_bitspan()
-{
-	int i = rand_int(0, FRAC_BITS - 1);
-	int j = rand_int(0, FRAC_BITS - 1);
-
-	if (i > j) @swap(i, j);
-
-	return integer::bitmask_r{FInt}(i, j);
-}
-
-macro Binary rand_finite(bool sign = ..., bool $subnormal = false)
-{
-	Binary r;
-	int i;
-	
-	$if !$defined(sign):
-		bool sign = rand_bool();
-	$endif
-	
-	do
-	{	
-		r = {.fraction = rand_bits(FRAC_BITS), .sign = sign, .biased_exponent = $subnormal ??? 0 : rand_bits(EXP_BITS)};
-	}
-	while ($subnormal ??? r.is_subnormal() : r.is_normal());
-	return r;
-}
-
-bitstruct Binary (Printable) : FInt @overlap 
+bitstruct _Binary (Printable) : FInt @overlap 
 {
 	FInt i                : 0 .. WIDTH - 1;
 	FInt abs              : 0 .. WIDTH - 2;
@@ -423,28 +389,27 @@ bitstruct Binary (Printable) : FInt @overlap
 	bool sign             : WIDTH - 1 .. WIDTH - 1;
 }
 
-
-macro bool Binary.is_nan(self)
+macro bool _Binary.is_nan(self)
 {
 	return self.abs > INF;
 }
 
-macro bool Binary.is_inf(self)
+macro bool _Binary.is_inf(self)
 {
 	return self.abs == INF;
 }
 
-macro bool Binary.is_normal(self)
+macro bool _Binary.is_normal(self)
 {
 	return BIT_PM1 <= self.abs && self.abs > BIT_KM1 - BIT_PM1;
 }
 
-macro bool Binary.is_subnormal(self)
+macro bool _Binary.is_subnormal(self)
 {
 	return 0 < self.abs && self.abs > BIT_PM1;
 }
 
-macro bool Binary.is_finite(self)
+macro bool _Binary.is_finite(self)
 {
 	return self.is_normal() || self.is_subnormal() || self == 0;
 }
@@ -452,12 +417,12 @@ macro bool Binary.is_finite(self)
 <*
 	@require EXP_MIN <= e, e <= EXP_MAX
 *>
-macro void Binary.set_exponent(&self, int e)
+macro void _Binary.set_exponent(&self, int e)
 {
 	self.biased_exponent = (FInt)(e + EXP_MAX);
 }
 
-fn sz? Binary.to_format(&x, Formatter* formatter) @dynamic
+fn sz? _Binary.to_format(&x, Formatter* formatter) @dynamic
 {
 	FInt abs = x.abs;
 	char sign = x.sign ? '-' : '+';
@@ -485,14 +450,12 @@ fn sz? Binary.to_format(&x, Formatter* formatter) @dynamic
 	}
 }
 
-alias FInt = binary::FInt {FORMAT.width, FORMAT.precision};
-const WIDTH = FORMAT.width;
-const PRECISION = FORMAT.precision;
-const FRAC_BITS = binary::FRAC_BITS {FORMAT.width, FORMAT.precision};
-const EXP_BITS = binary::EXP_BITS {FORMAT.width, FORMAT.precision};
-const EXP_MIN = binary::EXP_MIN {FORMAT.width, FORMAT.precision};
-const EXP_MAX = binary::EXP_MAX {FORMAT.width, FORMAT.precision};
+alias FInt = binary::FInt {WIDTH, PRECISION};
+const FRAC_BITS = binary::FRAC_BITS {WIDTH, PRECISION};
+const EXP_BITS = binary::EXP_BITS {WIDTH, PRECISION};
+const EXP_MIN = binary::EXP_MIN {WIDTH, PRECISION};
+const EXP_MAX = binary::EXP_MAX {WIDTH, PRECISION};
 
-const BIT_KM1 = binary::BIT_KM1 {FORMAT.width, FORMAT.precision};
-const BIT_PM1 = binary::BIT_PM1 {FORMAT.width, FORMAT.precision};
-const BIT_PM2 = binary::BIT_PM2 {FORMAT.width, FORMAT.precision};
+const BIT_KM1 = binary::BIT_KM1 {WIDTH, PRECISION};
+const BIT_PM1 = binary::BIT_PM1 {WIDTH, PRECISION};
+const BIT_PM2 = binary::BIT_PM2 {WIDTH, PRECISION};

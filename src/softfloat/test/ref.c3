@@ -2,7 +2,9 @@ module radiance::softfloat::test @if(env::TESTING);
 import std::io;
 import mpfr;
 
-macro _Binary32 @ref_binary32_1op2_rn(#mpfr_op2, _Binary32 x, _Binary32 y)
+const bool NATIVE_ARITH = $feature(USE_NATIVE_ARITHMETIC);
+
+macro _Binary32 @mpfr_binary32_1op2_rn(#mpfr_op2, _Binary32 x, _Binary32 y)
 {
 	assert(!t0f.set_binary32(x));
 	assert(!t1f.set_binary32(y));
@@ -12,10 +14,10 @@ macro _Binary32 @ref_binary32_1op2_rn(#mpfr_op2, _Binary32 x, _Binary32 y)
 	return t0f.get_binary32();
 }
 
-macro _Binary32 ref_binary32_add_rn(_Binary32 x, _Binary32 y) => @ref_binary32_1op2_rn(mpfr::add, x, y);
-macro _Binary32 ref_binary32_sub_rn(_Binary32 x, _Binary32 y) => @ref_binary32_1op2_rn(mpfr::sub, x, y);
-macro _Binary32 ref_binary32_mul_rn(_Binary32 x, _Binary32 y) => @ref_binary32_1op2_rn(mpfr::mul, x, y);
-macro _Binary32 ref_binary32_div_rn(_Binary32 x, _Binary32 y) => @ref_binary32_1op2_rn(mpfr::div, x, y);
+macro _Binary32 mpfr_binary32_add_rn(_Binary32 x, _Binary32 y) => @mpfr_binary32_1op2_rn(mpfr::add, x, y);
+macro _Binary32 mpfr_binary32_sub_rn(_Binary32 x, _Binary32 y) => @mpfr_binary32_1op2_rn(mpfr::sub, x, y);
+macro _Binary32 mpfr_binary32_mul_rn(_Binary32 x, _Binary32 y) => @mpfr_binary32_1op2_rn(mpfr::mul, x, y);
+macro _Binary32 mpfr_binary32_div_rn(_Binary32 x, _Binary32 y) => @mpfr_binary32_1op2_rn(mpfr::div, x, y);
 
 
 fn MpfrTernary Mpfr.set_binary32(&self, _Binary32 x)
@@ -48,7 +50,9 @@ fn void mpfr_init() @init
 	mpfr::init(t0f, t1f, t2f, t3f, prec: 24);
 }
 
-
-
+macro _Binary32 native_binary32_add_rn(_Binary32 x, _Binary32 y) => bitcast(bitcast(x, float) + bitcast(y, float), _Binary32);
+macro _Binary32 native_binary32_sub_rn(_Binary32 x, _Binary32 y) => bitcast(bitcast(x, float) - bitcast(y, float), _Binary32);
+macro _Binary32 native_binary32_mul_rn(_Binary32 x, _Binary32 y) => bitcast(bitcast(x, float) * bitcast(y, float), _Binary32);
+macro _Binary32 native_binary32_div_rn(_Binary32 x, _Binary32 y) => bitcast(bitcast(x, float) / bitcast(y, float), _Binary32);
 
 
