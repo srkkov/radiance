@@ -1,121 +1,6 @@
 module radiance::softfloat::binary <WIDTH, PRECISION>;
-import radiance::integer;
+import radiance::integer, radiance::integer::bit @public;
 import std::io;
-
-/*
- The general algorithm to implementing floating point operations is as follows
-
- 1. Detect and handle special inputs (zeros, infinities and NaNs).
-     - Compute the absolute value of the inputs, and handle the signs separately.
-
- 2. compute the exact result `r = (s,e)`
-     - Extract the biased exponents
-
- 3. round and pack `r` into the floating point format.
-
- Now we go into slightly more detail.
-
-
-
-
- Computing the result exponet.
-
- ##Overflow
-
- If `e` falls into the subnormal range, that is `e < EXP_MIN`
-
-
- Let's call the unbounded result exponent `e`, and the format encoded result exponent `d`.
- In ieee754, the different between `e` and `d`, is that `d` is biased, has limited range,
- and reserves some values for special encodings.
-
-  - `1 <= d <= 2 * EXP_MAX` encodes a normal number with `e = d - EXP_MAX`.
-  - 'd = 0' encodes a subnormal number with exponent `e = EXP_MAX`.
-  - `d = 0b11...1 <all ones>` then `r` may encode 
-*/
-
-<*
-	Computes rounding for "round to nearest, ties to even" rounding mode. 
-
-	round | sticky || rounding
-	--------------------------
-	    0 | 0      ||    0
-	    0 | 1      ||    0
-	    1 | 0      ||    lsb
-	    1 | 1      ||    1
-
-	@require sticky <= 1, round <= 1
-	@ensure return <= 1
-*>
-macro FInt round_nearest_even(FInt round, FInt sticky, FInt lsb)
-{
-	return round & (lsb | sticky);
-}
-
-<*
-	Computes rounding for "round to positive infinity" rounding mode. 
-
-	round | sticky || rounding
-	--------------------------
-	    0 | 0      ||    0
-	    0 | 1      ||   !sr
-	    1 | 0      ||   !sr  
-	    1 | 1      ||   !sr
-
-	@require sticky <= 1, round <= 1, sr == sr & SIGN_MASK
-	@ensure return <= 1
-*>
-macro FInt round_up(FInt round, FInt sticky, FInt sr)
-{
-	return ~(sr >> KM1) & (round | sticky);
-}
-
-<*
-	Computes rounding for "round to negative infinity" rounding mode. 
-
-	round | sticky || rounding
-	--------------------------
-	    0 | 0      ||    0
-	    0 | 1      ||    sr
-	    1 | 0      ||    sr  
-	    1 | 1      ||    sr
-
-	@require sticky <= 1, round <= 1, sr == sr & SIGN_MASK
-	@ensure return <= 1
-*>
-macro FInt round_down(FInt round, FInt sticky, FInt sr)
-{
-	return (sr >> KM1) & (round | sticky);
-}
-
-<*
- At least one |xs[i]| is in [0..0] or [INF..]
-*>
-macro bool _special_operands(...)
-{
-	FInt[$vaarg.len] args; 
-	FInt arg;
-	$for sz $i; $i < $vaarg.len; $i++:
-		arg = $vaarg[$i];
-		assert(arg & SIGN_MASK == 0);
-		args[$i] = arg - (FInt)1;
-	$endfor
-	return integer::max(...args) >= INF - (FInt)1;
-}
-
-<*
- At least one |xs[i]| is in [0..MAX_SUBNORMAL] or [INF..]
-*>
-macro bool _special_or_subnormal_operands(...)
-{
-	uint[$vaarg.len] args; 
-	$for sz $i; $i < $vaarg.len; $i++:
-		uint arg = $vaarg[$i];
-		assert(arg & SIGN_MASK == 0);
-		args[$i] = arg - (FInt)1;
-	$endfor
-	return integer::max(...args) >= INF - (FInt)1;
-}
 
 fn FInt add_rn(FInt x, FInt y)
 {
@@ -163,7 +48,7 @@ fn FInt add_rn(FInt x, FInt y)
 
 	if (_special_operands(abs_x, abs_y))
 	{
-		max_abs = max(abs_x, abs_y);
+		max_abs = _max(abs_x, abs_y);
 
 		// Either at least one operand is NaN or |x| and |y| are infinities with opposite signs.
 		if (max_abs > INF || (s && abs_x == INF && abs_y == INF))
@@ -233,7 +118,7 @@ fn FInt add_rn(FInt x, FInt y)
 	// the only part of the shift we are keeping. We are also able to compute
 	// a partial sticky of the bits we did not keep before/during the
 	// addition/subtraction. Again see [0] for why.
-	high_y = my >> min(WIDTH - 1, e_diff);
+	high_y = my >> _min(WIDTH - 1, e_diff);
 
 	switch 
 	{
@@ -247,7 +132,7 @@ fn FInt add_rn(FInt x, FInt y)
 
 		// some bits discarded, we directly compute the sticky of the discarded bits
 		default:
-			low_y = my.bit_or(e_diff);
+			low_y = _reduce_or(my, e_diff);
 	}
 
 	// Significand addition/subtraction with partial sticky.
@@ -262,17 +147,17 @@ fn FInt add_rn(FInt x, FInt y)
 	//  result_leading_zeros = max(EXP_MIN - e, 0)
 	//                       = max(EXP_MIN - ex + n, 0)
 	//                       = max(-t + n, 0)
-	n = lzcnt(high_r) - V;
+	n = _lzcnt(high_r) - V;
 	c = (int)(high_r >> U);
 
-	lz_r = max(n - t, 0);
+	lz_r = _max(n - t, 0);
 	
 	high_r <<= n + c - lz_r;
 
 	u = high_r >> (3 + c);
 
 	guard = high_r.bit(2 + c);
-	sticky = high_r.bit_or(2 + c);
+	sticky = _reduce_or(high_r, 2 + c);
 
 	rounding = guard & (u | sticky);
 
@@ -290,7 +175,7 @@ fn FInt add_rn(FInt x, FInt y)
 	//   = max(t - n - 1, 1)
 	// 
 	// d - 1 = max(t - n, 0)
-	dm1 = (FInt)max(t - n, 0);
+	dm1 = (FInt)_max(t - n, 0);
 
 	// overflow if e > EXP_MAX
 	if (dm1 >= 2 * EXP_MAX)
@@ -351,6 +236,8 @@ fn FInt add_rn(FInt x, FInt y)
 	In the subnormal case, we must shift by an additionl lz_x bits, totaling to max(lzcnt(abs_x)
 
 
+	AARGGG
+	YAARRG
 
 */
 
@@ -378,8 +265,8 @@ fn FInt mul_rn(FInt x, FInt y)
 
 	if (_special_operands(abs_x, abs_y))
 	{
-		max_abs = max(abs_x, abs_y);
-		min_abs = min(abs_x, abs_y);
+		max_abs = _max(abs_x, abs_y);
+		min_abs = _min(abs_x, abs_y);
 
 		switch
 		{
@@ -403,22 +290,22 @@ fn FInt mul_rn(FInt x, FInt y)
 	nx = _normal_bit(abs_x);
 	ny = _normal_bit(abs_y);
 
-	mlz_x = max(lzcnt(abs_x), EXP_BITS);
-	mlz_y = max(lzcnt(abs_y), EXP_BITS);
+	mlz_x = _max(_lzcnt(abs_x), EXP_BITS);
+	mlz_y = _max(_lzcnt(abs_y), EXP_BITS);
 
 	// create normalized significands
 	mx = (abs_x << mlz_x) | SIGN_MASK;
 	my = (abs_y << mlz_y) | SIGN_MASK;
 
-	low_prod = mul(&high_prod, mx, my);
+	low_prod = _mul(&high_prod, mx, my);
 
 	c = (int)high_prod.msb();
 
 	t = ((int)bx - (int)nx) + ((int)by - (int)ny) - (mlz_x + mlz_y) + 2 * EXP_BITS + EXP_MIN + c;
 
-	dm1 = (FInt)max(t, 0);
+	dm1 = (FInt)_max(t, 0);
 
-	lz_r = max(-t, 0);
+	lz_r = _max(-t, 0);
 
 	// overflow before rounding
 	if (dm1 >= 2 * EXP_MAX)
@@ -435,13 +322,13 @@ fn FInt mul_rn(FInt x, FInt y)
 
 	// rounding
 
-	s = min(lz_r + c, K-1);
+	s = _min(lz_r + c, K-1);
 
 	u = (high_prod >> (K-2 - (P-1))) >> s;
 
 	round = (high_prod >> (K-2 - P)).bit(s);
 
-	sticky = high_prod.bit_or(min(K-2 - (P+2) + lz_r + c, K-1)) | low_prod.bit_or();
+	sticky = _reduce_or(high_prod, _min(K-2 - (P+2) + lz_r + c, K-1)) | _reduce_or(low_prod);
 
 	rounding = round & (u | sticky);
 
@@ -450,10 +337,39 @@ fn FInt mul_rn(FInt x, FInt y)
 	return sr | abs_r;
 }
 
+<*
+ We need to compute x * 2^(k-1) / y * 2^(k-1) = q * 2^(k-1), q = x * 2^(k-1) / y
+
+ Resulting algorithm: basecase_divrem( X: (mx * 2^(k-1); 1), Y: (my; 1) )
+	
+	q' = div_floor(X[1] * 2^k + X[0], Y[0]);
+	q  = min(q', 2^k - 1);
+	X  = X - q * Y;
+	while X < 0
+	{
+		q = q - 1;
+		X = X + Y;
+	}
+	return Q = q, R = X
+
+*>
+fn void divide_fractions(FInt* q, FInt* r, FInt mx, FInt my)
+{
+	
+}
+
+
+
+// <*
+//  Computes the correctly rounded value of `x / y`.
+//
+//
+//  IEEE754-2019 compliant with the `division` arithmetic operation in rounding modes:
+//   - roundTiesToEven
+// *>
 // fn FInt div_rn(FInt x, FInt y)
 // {
 // 	FInt abs_x, abs_y;
-//
 //
 // 	// (abs_max == abs_min && (abs_max == 0) || (abs_max == INF))
 // 	// 	return QNAN | abs_max;
@@ -505,109 +421,6 @@ fn FInt mul_rn(FInt x, FInt y)
 // }
 
 
-<*
- Extracts the *biased exponent* field of the absolute value of an ieee754 binary 
- floating point bit representation.
-
- Example for binary32:
-
-	abs_x  = 0 eeeeeeee fffffffffffffffffffffff
-	return = 0 00000000 000000000000000eeeeeeee
-
- @require is_regular(abs_x)
- @ensure return < (FInt)1 << EXP_BITS
-*>
-macro FInt _biased_exponent(FInt abs_x) @private
-{
-	return abs_x >> FRAC_BITS;
-}
-
-<*
- Returns true if the given absolute value of an ieee754 binary 
- floating point is a normal number.
-
- @require is_regular(abs_x)
-*>
-macro bool _normal_bit(FInt abs_x) @private
-{
-	return abs_x >= MIN_NORMAL;
-}
-
-<*
- Ya.
-*>
-macro FInt _abs(FInt x) @private
-{
-	return x & ~SIGN_MASK;
-}
-
-<*
- Packs all components of the resulting floating point number, excluding the sign,
- and simultaneously applies rounding.
-
- --- Explanation ---
-
- Let `r` be the result floating point number of some scalar-valued operation.
- Let `e` be the exponent of the `r` in the unbounded domain.
- Let `u` be the truncated significand of `r`, and `f` be the truncated fraction of `r`.
-
- Let `d` be the biased value of `e` in the current floating point format.
- At this point overflow before rounding as been taken care of.
-
- --- Rounding ---
-
- Before rounding, our result looks like this:
-
-	0 dddddddd fffffffffffffffffffffff
-
- We can see that rounding can be applied simply by just adding the rounding bit to the result 
- as a `k-1` bit integer. An overflow of the fraction field will increment the exponent field 
- automatically, and in the case of *overflow after rounding*, where `e = EXP_MAX` and 
- `f = 1 << FRAC_BITS - 1`, it will automatically overflow into the representation of `INF`.
-
-	  0 11111110 11111111111111111111111    (largest normal)
-	+                                  1
-	------------------------------------
-	= 0 11111111 00000000000000000000000    (infinity)
-
- It's also the case that the largest subnormal number will automatically transition
- to the smallest normal number.
-
-	  0 00000000 11111111111111111111111    (largest subnormal)
-	+                                  1
-	------------------------------------
-	= 0 00000001 00000000000000000000000    (smallest normal)
-
- --- Packing ---
-
- Before rounding, we must pack the absolute value of the result:
-
- 	0 dddddddd fffffffffffffffffffffff 
-
- We must calulate the truncated fraction `f` of the result before applying rounding,
- but we commonly have the truncated significand `u` after the core computation, which 
- just has the hidden leading 1, `u = 1.ff...f`.
-
- Instead of removing the hidden bit, it's more efficient to calculate `d - 1`, and pack by 
- computing `(d - 1) << FRAC_BITS + u`. In the case of normal numbers the hidden 1 in `u` will
- just increment the `d - 1` field back to the value of `d`. In the case of subnormal numbers,
- we've clamped `d = 0` and `u` will not contain the hidden leading 1, thus `d` is unchanged.
-
- TODO: Write and point to the description of how we calculate `d - 1`.
-
- --- End ---
-
- @require u <= integer::max_unsigned_bits(PRECISION)
- @require dm1 <= integer::max_unsigned_bits(EXP_BITS) - 1
- @require rounding <= 1
-*>
-macro FInt _round_pack(FInt u, FInt dm1, FInt rounding)
-{
-	return ((dm1 << FRAC_BITS) + u) + rounding;
-}
-
-
-//
 // fn FInt sqrt_rn(FInt x, FInt y)
 //
 // fn FInt fma_rn(FInt x, FInt y, FInt z)
@@ -615,12 +428,9 @@ macro FInt _round_pack(FInt u, FInt dm1, FInt rounding)
 // fn FInt fmma_rn(FInt x, FInt y, FInt z, FInt w)
 
 
-alias max = integer::max;
-alias min = integer::min;
-alias mul = integer::mul;
-alias lzcnt = integer::lzcnt;
 
-// Don't make fun of me I didn't go to college.
+
+// These citations are a little sloppy, does it matter?
 
 // Sources
 //

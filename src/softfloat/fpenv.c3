@@ -1,20 +1,26 @@
-module radiance::softfloat;
+module radiance::flt;
 
-// Interface fpenv
-// fn void subnormal_inputs_enabled()
-// fn void subnormal_outputs_enabled()
 
-struct SoftFloatEnv
+struct FltEnv
 {
-	SoftFloatExceptionMask  flags; 
-	SoftFloatExceptionMask  exceptions;
-	RadianceRoundingMode    rounding_mode;
-	bool                    flush_subnormal_inputs;
-	bool                    flush_subnormal_outputs;
-	bool                    underflow_after_rounding;
+	FltExceptionMask  flags; 
+	FltExceptionMask  exceptions;
+	FltRoundingMode   rounding_mode;
+	bool              flush_subnormal_inputs;
+	bool              flush_subnormal_outputs;
+	bool              underflow_after_rounding;
 }
 
-enum SoftFloatException : char
+enum FltRoundingMode : char
+{
+	NEAREST_EVEN,
+	TO_ZERO,
+	UP,
+	DOWN,
+	NEAREST_ODD,
+}
+
+enum FltException : char
 {
 	<*
 		This exception is signaled when there is no meaningfully definable result 
@@ -66,61 +72,59 @@ enum SoftFloatException : char
 
 }
 
-bitstruct SoftFloatExceptionMask : char
+bitstruct FltExceptionMask : char
 {
-	// IEEE754
+	// ieee754-2019
 	bool invalid;
 	bool infinite;
 	bool overflow;
 	bool underflow;
 	bool inexact;
 
-	// NON-IEEE754
+	// non ieee754-2019
 	bool subnormal;
 }
 
-alias SoftFloatExceptionHandler = fn void(SoftFloatExceptionMask);
+alias FltExceptionHandler = fn void(FltExceptionMask);
 
 
-fn bool SoftFloatExceptionMask.test(self, SoftFloatExceptionMask flags)
+fn bool FltExceptionMask.test(self, FltExceptionMask flags)
 {
 	return !!(self & flags);
 }
 
-fn SoftFloatExceptionMask SoftFloatEnv.save_flags(&self)
+fn FltExceptionMask FltEnv.save_flags(&self)
 {
 	return self.flags;
 }
 
-fn void SoftFloatEnv.restore_flags(&self, SoftFloatExceptionMask flags)
+fn void FltEnv.restore_flags(&self, FltExceptionMask flags)
 {
 	self.flags = flags;
 }
 
-fn void SoftFloatEnv.raise_flags(&self, SoftFloatExceptionMask flags)
+fn void FltEnv.raise_flags(&self, FltExceptionMask flags)
 {
 	self.flags |= flags;
 }
 
-fn void SoftFloatEnv.lower_flags(&self, SoftFloatExceptionMask flags)
+fn void FltEnv.lower_flags(&self, FltExceptionMask flags)
 {
 	self.flags &= ~flags;
 }
 
-fn bool SoftFloatEnv.test_flags(&self, SoftFloatExceptionMask flags)
+fn bool FltEnv.test_flags(&self, FltExceptionMask flags)
 {
 	return self.flags.test(flags);
 }
 
+tlocal FltEnv _env;
 
-
-tlocal SoftFloatEnv _env;
-
-fn SoftFloatExceptionMask save_flags() => _env.save_flags();
-fn void restore_flags(SoftFloatExceptionMask flags) => _env.restore_flags(flags);
-fn void raise_flags(SoftFloatExceptionMask flags) => _env.raise_flags(flags);
-fn void lower_flags(SoftFloatExceptionMask flags) => _env.lower_flags(flags);
-fn bool test_flags(SoftFloatExceptionMask flags) => _env.test_flags(flags);
+fn FltExceptionMask save_flags() => _env.save_flags();
+fn void restore_flags(FltExceptionMask flags) => _env.restore_flags(flags);
+fn void raise_flags(FltExceptionMask flags) => _env.raise_flags(flags);
+fn void lower_flags(FltExceptionMask flags) => _env.lower_flags(flags);
+fn bool test_flags(FltExceptionMask flags) => _env.test_flags(flags);
 
 
 

@@ -8,11 +8,17 @@
 	"sanitize": "none",
 
 	"sources": [ 
-		"src/util.c3",
+		"src/builtin/*",
+		"src/types/*",
+
 		"src/env.c3",
 		"src/rounding.c3",
-		"src/integer/*",
-		"src/softfloat/*"
+
+		"src/integer/**",
+		"src/vector/*",
+		"src/softfloat/*",
+		"src/softfloat/arithmetic",
+		"src/ap/**"
 	],
 
 	"targets": {

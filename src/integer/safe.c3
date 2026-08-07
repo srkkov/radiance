@@ -1,19 +1,18 @@
-module radiance::integer;
+module radiance::integer <Integer> @private;
 import std::math;
-//  overflow_add
-//  overflow_sub
-//  overflow_mul
+/* overflow_add
+   overflow_sub
+   overflow_mul */
 
 faultdef OUT_OF_RANGE, DIVISION_BY_ZERO;
 
 <*
- @require @is_int(x) : "Operand must be an integer."
  @return? OUT_OF_RANGE
 *>
-macro checked_abs(x)
+fn Integer? _try_abs(Integer x)
 {
-	$if @is_signed(x):
-		if (x == $Typeof(x)::min) return OUT_OF_RANGE~;
+	$if !SIGNED:
+		if (x == Integer::min) return OUT_OF_RANGE~;
 		return abs(x);
 	$else
 		return x;
@@ -21,69 +20,69 @@ macro checked_abs(x)
 }
 
 <*
- @require @is_signed(x) : "Operand must be a signed integer."
  @return? OUT_OF_RANGE
 *>
-macro checked_neg(x)
+fn Integer? _try_neg(Integer x)
 {
-	if (x == $Typeof(x)::min) return OUT_OF_RANGE~;
+	if (x == Integer::min) return OUT_OF_RANGE~;
 	return -x;
 }
 
 <*
- @require @is_int(x, y) : "Operands must be integers."
- @require @type_match(x, y) : "Operands must be the type."
- @require @is_signed(x) : "Operands must be signed integers of the same type."
  @return? OUT_OF_RANGE
 *>
-macro checked_add(x, y)
+fn Integer? _try_add(Integer x, Integer y)
 {
-	$Typeof(x) r;
+	Integer r;
 	if (std::math::overflow_add(x, y, &r)) return OUT_OF_RANGE~;
 	return r;
 }
 
 <*
- @require @is_int(x, y) : "Operands must be integers."
- @require @type_match(x, y) : "Operands must be the type."
- @require @is_signed(x) : "Operands must be signed integers of the same type."
  @return? OUT_OF_RANGE
 *>
-macro checked_sub(x, y)
+fn Integer? _try_sub(Integer x, Integer y)
 {
-	$Typeof(x) r;
+	Integer r;
 	if (std::math::overflow_sub(x, y, &r)) return OUT_OF_RANGE~;
 	return r;
 }
 
 <*
- @require @is_int(x, y) : "Operands must be integers."
- @require @type_match(x, y) : "Operands must be the type."
+ @return? OUT_OF_RANGE
 *>
-macro checked_mul(x, y)
+fn Integer? _try_mul(Integer x, Integer y)
 {
-	$Typeof(x) r;
+	Integer r;
 	if (std::math::overflow_mul(x, y, &r)) return OUT_OF_RANGE~;
 	return r;
 }
 
-<*
- @require @is_int(x, y) : "Operands must be integers."
- @require @type_match(x, y) : "Operands must be the type."
- @return? DIVISION_BY_ZERO, OUT_OF_RANGE
-*>
-macro checked_div(x, y)
-{
-	if (!y) return DIVISION_BY_ZERO~;
-	$if @is_signed(x):
-		if (x == $Typeof(x)::min && y == -1) return OUT_OF_RANGE~;
-	$endif
-	return x / y;
-}
+// <*
+//  @return? DIVISION_BY_ZERO, OUT_OF_RANGE
+// *>
+// fn Integer? _try_div(Integer x, Integer y)
+// {
+// 	if (!y) return DIVISION_BY_ZERO~;
+// 	$if SIGNED:
+// 		if (x == Integer::min && y == -1) return OUT_OF_RANGE~;
+// 	$endif
+// 	return x / y;
+// }
 
-// TODO: remainder
+module radiance::integer;
 
+macro try_abs(x) => _try_abs{$Typeof(x)}(x);
+macro try_neg(x) => _try_neg{$Typeof(x)}(x);
+macro try_add(x) => _try_add{$Typeof(x)}(x);
+macro try_sub(x) => _try_sub{$Typeof(x)}(x);
+macro try_mul(x) => _try_mul{$Typeof(x)}(x);
 
+macro exact_abs(x) => _try_abs{$Typeof(x)}(x)!!;
+macro exact_neg(x) => _try_neg{$Typeof(x)}(x)!!;
+macro exact_add(x) => _try_add{$Typeof(x)}(x)!!;
+macro exact_sub(x) => _try_sub{$Typeof(x)}(x)!!;
+macro exact_mul(x) => _try_mul{$Typeof(x)}(x)!!;
 
 
 

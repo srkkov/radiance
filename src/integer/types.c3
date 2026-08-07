@@ -1,47 +1,19 @@
 module radiance::integer;
-import std::core::types;
 
-macro @is_int(...)
-{
-	return @all(is_int, ...$vaarg);
-}
-
-macro @is_signed(...)
-{
-	return @all(is_signed, ...$vaarg);
-}
-
-macro @is_unsigned(...)
-{
-	return @all(is_unsigned, ...$vaarg);
-}
-
-macro bool @all(#check, ...) @local
-{
-	$for sz $i; $i < $vaarg.len; $i++:
-		$if !#check($Typeof($vaarg[$i])):
-			return false;
-		$endif
-	$endfor
-	return true;
-}
+const MAX_BITS = 128;
+const MIN_BITS = 8;
 
 <*
- @require $vaarg.len > 0
+ @require is_int($Type)
+ @ensure return > 0, return <= MAX_BITS
 *>
-macro @type_match(...) @private
+macro int bitsize($Type)
 {
-	var $Type = $Typeof($vaarg[0]);
-	$for sz $i = 1; $i < $vaarg.len; $i++:
-		$if $Type != $Typeof($vaarg[$i]):
-			return false;
-		$endif
-	$endfor
-	return true;
+	return (int)$Type::size * 8;
 }
 
 <*
- @require 0 < $bitsize, $bitsize <= 128
+ @require $bitsize > 0, $bitsize <= MAX_BITS 
 *>
 macro unsigned_from_bitsize(int $bitsize) @const
 {
@@ -55,7 +27,7 @@ macro unsigned_from_bitsize(int $bitsize) @const
 }
 
 <*
- @require 0 < $bitsize, $bitsize <= 128
+ @require $bitsize > 0, $bitsize <= MAX_BITS 
 *>
 macro signed_from_bitsize(int $bitsize) @const
 {
@@ -68,127 +40,20 @@ macro signed_from_bitsize(int $bitsize) @const
 	$endswitch
 }
 
-macro int_from_bitsize(int $bitsize, bool $signed)
+macro int_from_bitsize(int $bitsize, bool $signed) @const
 {
 	return $signed ???
 		signed_from_bitsize($bitsize) : unsigned_from_bitsize($bitsize);
 }
 
-<*
- @require 0 < $bits, $bits <= 128
-*>
-macro max_unsigned_bits(int $bits)
-{
-	$if $bits == 128:
-		return uint128::max;
-	$else
-		return ($Typefrom(unsigned_from_bitsize($bits)))(1ull << $bits - 1ull);
-	$endif
-}
-
-<*
- @require 0 < $bits, $bits <= 128
-*>
-macro max_signed_bits(int $bits)
-{
-	$if $bits == 128:
-		return int128::max;
-	$else
-		return ( $Typefrom(signed_from_bitsize($bits)) ) (1ull << $bits - 1ull);
-	$endif
-}
-
-<*
- @require 0 < $bits, $bits <= 128
-*>
-macro min_signed_bits(int $bits)
-{
-	$if $bits == 128:
-		return int128::min;
-	$else
-		return ( $Typefrom(signed_from_bitsize($bits)) ) -(1ull << ($bits - 1));
-	$endif
-}
-
-
-
-
-
-
-
-
-
-
-<*
- @ensure return <= 128
-*>
-macro int bitsize($Type) @const
-{
-	return (int)$Type::size * 8;
-}
-
-macro @bitsizeof(#x) @const => bitsize($Typeof(#x));
-
-macro bool is_int($Type) @const
-{
-	$switch $Type::kind:
-		$case UNSIGNED_INT:
-		$case SIGNED_INT:
-			return true;
-		$case VECTOR:
-		$case BITSTRUCT:
-		$case TYPEDEF:
-			return is_unsigned($Type::inner);
-		$default:
-			return false;
-	$endswitch
-}
-
-macro bool is_unsigned($Type) @const
-{
-	$switch $Type::kind:
-		$case UNSIGNED_INT:
-			return true;
-		$case VECTOR:
-		$case BITSTRUCT:
-		$case TYPEDEF:
-			return is_unsigned($Type::inner);
-		$default:
-			return false;
-	$endswitch
-}
-
-macro bool is_signed($Type) @const
-{
-	$switch $Type::kind:
-		$case SIGNED_INT:
-			return true;
-		$case VECTOR:
-		$case BITSTRUCT:
-		$case TYPEDEF:
-			return is_signed($Type::inner);
-		$default:
-			return false;
-	$endswitch
-}
-
-macro flat_kind($Type)
-{
-	$switch $Type::kind:
-		$case SIGNED_INT:
-			return $Type;
-		$case VECTOR:
-		$case BITSTRUCT:
-		$case TYPEDEF:
-			return core_kind($Type::inner);
-		$default:
-			return false;
-	$endswitch
-}
-
 macro bool has_doublewidth_type($Type) @const
 {
-	return bitsize($Type) <= 64;
+	return bitsize($Type) <= MAX_BITS / 2;
+}
+
+macro bool has_halfwidth_type($Type) @const
+{
+	return bitsize($Type) > MIN_BITS;
 }
 
 macro doublewidth_type($Type) @const
@@ -201,27 +66,25 @@ macro halfwidth_type($Type) @const
 	return int_from_bitsize(bitsize($Type) / 2, is_signed($Type));
 }
 
-macro vector_halfwidth_type($Type) @const
-{
-	return $Typefrom($Type::inner)[<$Type::len/2>] @simd;
-}
-
-macro vector_doublewidth_type($Type) @const
-{
-	return $Typefrom($Type::inner)[<$Type::len*2>] @simd;
-}
-
-macro vector_halfwidth_lane_type($Type) @const
-{
-	return $Typefrom(halfwidth_type($Type::inner))[<$Type::len*2>] @simd;
-}
-
-macro vector_doublewidth_lane_type($Type) @const
-{
-	return $Typefrom(doublewidth_type($Type::inner))[<$Type::len/2>] @simd;
-}
-
-
+// macro vector_halfwidth_type($Type) @const
+// {
+// 	return $Typefrom($Type::inner)[<$Type::len/2>] @simd;
+// }
+//
+// macro vector_doublewidth_type($Type) @const
+// {
+// 	return $Typefrom($Type::inner)[<$Type::len*2>] @simd;
+// }
+//
+// macro vector_halfwidth_lane_type($Type) @const
+// {
+// 	return $Typefrom(halfwidth_type($Type::inner))[<$Type::len*2>] @simd;
+// }
+//
+// macro vector_doublewidth_lane_type($Type) @const
+// {
+// 	return $Typefrom(doublewidth_type($Type::inner))[<$Type::len/2>] @simd;
+// }
 
 
 
@@ -230,22 +93,13 @@ macro vector_doublewidth_lane_type($Type) @const
 
 
 
-macro const_max($x, $y) @const
-{
-	return $x > $y ? $x : $y;
-}
-
-macro const_min($x, $y) @const
-{
-	return $x < $y ? $x : $y;
-}
 
 <*
  @require is_signed($Type) == is_signed($Least) : "Types must have the same signedness"
 *>
-macro type_atleast($Type, $Least) @const
+macro atleast_type($Type, $Least) @const
 {
-	return int_from_bitsize(const_max(bitsize($Type), bitsize($Least)), is_signed($Type));
+	return int_from_bitsize(@max(bitsize($Type), bitsize($Least)), is_signed($Type));
 }
 
 macro unsigned_equivalent($Type)
@@ -260,7 +114,7 @@ macro signed_equivalent($Type)
 
 const String[] INT_TYPES =
 {
-	"char", "ichar",
+	"ichar", "char",
 	"short", "ushort",
 	"int", "uint",
 	"long", "ulong",
@@ -284,11 +138,6 @@ const String[] UNSIGNED_TYPES =
 	"ulong",
 	"uint128",
 };
-
-
-
-
-
 
 
 
