@@ -11,9 +11,9 @@ faultdef OUT_OF_RANGE, DIVISION_BY_ZERO;
 *>
 fn Integer? _try_abs(Integer x)
 {
-	$if !SIGNED:
+	$if SIGNED:
 		if (x == Integer::min) return OUT_OF_RANGE~;
-		return abs(x);
+		return _abs(x);
 	$else
 		return x;
 	$endif

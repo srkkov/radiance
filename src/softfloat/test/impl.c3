@@ -1,371 +1,303 @@
-module radiance::softfloat::test <WIDTH, PRECISION> @if(env::TESTING);
-import radiance::softfloat::binary @public;
+module radiance::flt::binary <WIDTH, PRECISION> @feat(TESTING);
 import radiance::integer;
-import std::math::random, std::io;
+import std::io;
 
+alias Op2 = fn _Binary(_Binary,_Binary);
 
-// macro void @test_binary_addition_special_rn(#op)
-// {	
-// 	const _Binary P_ZERO = {};
-// 	const _Binary N_ZERO = {.sign = true};
-// 	const _Binary P_INF = {.abs = INF};
-// 	const _Binary N_INF = {.abs = INF, .sign = true};
-//
-// 	_Binary pfinite = rand_finite(false);
-// 	_Binary nfinite = rand_finite(true);
-//
-// 	// addition
-// 	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
-// 	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
-// 	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
-// 	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
-//
-// 	// subtraction
-// 	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
-// 	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
-// 	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
-// 	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
-//
-// 	assert(#op(P_ZERO, pfinite).is_finite());
-// 	assert(#op(N_ZERO, nfinite).is_finite());
-//
-// 	assert(#op(P_INF, pfinite).is_finite());
-// 	assert(#op(N_INF, nfinite).is_finite());
-//
-// 	assert(#op(P_INF, P_INF) == P_INF);
-// 	assert(#op(N_INF, N_INF) == N_INF);
-//
-// 	assert(@op(QNAN, pfinite).is_nan());
-// 	assert(@op(QNAN, nfinite).is_nan());
-//
-// 	assert(@op(pfinite, QNAN).is_nan());
-// 	assert(@op(nfinite, QNAN).is_nan());
-//
-// 	assert(@op(QNAN, QNAN).is_nan());
-// 	assert(@op(QNAN, QNAN).is_nan());
-// }
-//
-// macro void @test_binary_subtraction_special_rn(#op)
-// {	
-// 	const _Binary P_ZERO = {};
-// 	const _Binary N_ZERO = {.sign = true};
-// 	const _Binary P_INF = {.abs = INF};
-// 	const _Binary N_INF = {.abs = INF, .sign = true};
-//
-// 	_Binary pfinite = rand_finite(false);
-// 	_Binary nfinite = rand_finite(true);
-//
-// 	assert(#op(P_ZERO, P_ZERO) == P_ZERO);
-// 	assert(#op(P_ZERO, N_ZERO) == P_ZERO);
-// 	assert(#op(N_ZERO, P_ZERO) == P_ZERO);
-// 	assert(#op(N_ZERO, N_ZERO) == N_ZERO);
-//
-// 	assert(#op(P_ZERO, pfinite).is_finite());
-// 	assert(#op(N_ZERO, nfinite).is_finite());
-//
-// 	assert(#op(P_INF, pfinite).is_finite());
-// 	assert(#op(N_INF, nfinite).is_finite());
-//
-// 	assert(#op(P_INF, P_INF) == P_INF);
-// 	assert(#op(N_INF, N_INF) == N_INF);
-// }
-
-<*
- Tests 2 operands that have an exponent difference equal to `0` or `1`.
- Mainly used for addition/subtraction testing.
-*>
-macro void @test_add_normal_close_case(#ref_op, #op, bool $different_signs)
+macro void @test_addition_self(#add, #sub, bool $symmetric_rounding = false)
 {
-	_Binary x, y;
-	for (int i; i < 2; i++)
+	_Binary r0, r1, x, y;
+	
+	for (int i; i <= PRECISION; i++)
 	{
-		@repeat(LONG_TEST ??? 40_000 : 800)
+		int ex, ey;
+		set_rand_exponents_from_diff(i, &x, &y);
+
+		do
 		{
-			int ex, ey; rand_exponents_from_diff(i, &ex, &ey);
-			x.set_exponent(ex);
-			y.set_exponent(ey);
-
-			random_sign_pair(&x, &y, $different_signs);
-
-			@test_op2_fractions(x, y, #ref_op, #op);
-		};
-	}
-}
-
-<*
- Tests 2 operands that have an exponent difference equal between `2` and `PRECISION`.
- Mainly used for addition/subtraction testing.
-*>
-macro void @test_add_normal_far_case_1(#ref_op, #op, bool $different_signs)
-{
-	_Binary x, y;
-	for (int i = 2; i <= PRECISION; i++)
-	{
-		@repeat(LONG_TEST ??? 20_000 : 400)
-		{
-			int ex, ey; rand_exponents_from_diff(i, &ex, &ey);
-			x.set_exponent(ex);
-			y.set_exponent(ey);
-
-			random_sign_pair(&x, &y, $different_signs);
-
-			@test_op2_fractions(x, y, #ref_op, #op);
-		};
-	}
-}
-
-<*
- Tests 2 operands that have an exponent difference higher than `PRECISION`.
- Mainly used for addition/subtraction testing.
-*>
-macro void @test_add_normal_far_case_2(#ref_op, #op, bool $different_signs)
-{
-	_Binary x, y;
-	int ex, ey;
-	for (int exp_diff = PRECISION + 1; exp_diff <= EXP_MAX - EXP_MIN; exp_diff++)
-	{
-		@repeat(LONG_TEST ??? 10_000 : 100)
-		{
-			rand_exponents_from_diff(exp_diff, &ex, &ey);
-			x.set_exponent(ex);
-			y.set_exponent(ey);
-
-			random_sign_pair(&x, &y, $different_signs);
-
-			@test_op2_fractions(x, y, #ref_op, #op);
-		};
-	}
-}
-
-<*
- Tests some subnormal operands pairs, exluding the sign.
-*>
-macro void @test_op2_subnormal(#ref_op, #op, bool $different_signs = ...)
-{
-	_Binary x, y;
-
-	$if $defined($different_signs):
-		$if $different_signs:
-			x.sign = true;
-			@test_op2_fractions(x, y, #ref_op, #op);
-			x.sign = false; y.sign = true;
-			@test_op2_fractions(x, y, #ref_op, #op);
-		$else
-			@test_op2_fractions(x, y, #ref_op, #op);
-			x.sign = true; y.sign = true;
-			@test_op2_fractions(x, y, #ref_op, #op);
-		$endif
-	$else
-		@test_op2_fractions(x, y, #ref_op, #op);
-		y.sign = true;
-		@test_op2_fractions(x, y, #ref_op, #op);
-		x.sign = true; y.sign = false;
-		@test_op2_fractions(x, y, #ref_op, #op);
-		y.sign = true;
-		@test_op2_fractions(x, y, #ref_op, #op);
-	$endif
-}
-
-<*
- Tests all subnormal operands pairs, exluding the sign.
-*>
-macro void @test_op2_all_subnormals(#ref_op, #op)
-{
-	_Binary x, y;
-	for (FInt i; i < FRAC_BITS; i++)
-	{
-		x.fraction = i;
-		for (FInt j; j < FRAC_BITS; j++)
-		{	
-			y.fraction = j;
-			@test_op(#ref_op, #op, x, y);
+			x.fraction = rand_bits(FRAC_BITS);
+			y.fraction = rand_bits(FRAC_BITS);
 		}
+		while (x.fraction == y.fraction);
+
+		foreach (bool sx : {false, true})
+		{
+			foreach (bool sy : {false, true})
+			{
+				x.sign = sx;
+				y.sign = sy;
+
+				// ∘(x + y) = ∘(y + x)
+				r0 = #add(x, y);
+				r1 = #add(y, x);
+				@check(r0 == r1, "commutativity of addition");
+
+				// ∘(x + (-y)) = ∘(x - y)
+				r0 = #sub(x, y);
+				y.negate();
+				r1 = #add(x, y);
+				@check(r0 == r1, "definition of subtraction");
+
+				// restore
+				y.sign = sy;
+
+				$if $symmetric_rounding:
+
+					// ∘(x - y) =  -∘(y - x)
+					r0 = #add(x, y);
+					r0.negate();
+					r1 = #sub(y, x);
+					@check(r0 == r1, "anti-commutativity of subtraction, symmetric rounding mode (1)");
+
+					// ∘(x + y) = -∘((-y) + (-x))
+					r0 = #add(x, y);
+					x.negate();
+					y.negate();
+					r1 = #add(x, y);
+					r1.negate();
+					@check(r0 == r1, "symmetric rounding mode (2)");
+
+				$endif
+
+				// restore
+				x.sign = sx;
+				y.sign = sy;
+
+				// ∘(x + y) = ∘(x - (-y))
+				r0 = #add(x, y);
+				y.negate();
+				r1 = #sub(x, y);
+				@check(r0 == r1, "double negative");
+			}
+		}
+
+		x.biased_exponent = bias_exponent(0);
+		y.biased_exponent = bias_exponent(0);
+		x.sign = false;
+		y.sign = false;
+
+		r0 = #add(x, y);
+		@check(r0.sign == false, "x > 0, y > 0 => x + y > 0");
+
+		if (x.fraction < y.fraction)
+		{
+			@swap(x, y);
+		}
+		// |x| > |y|	
+
+		// ∘(x - y) > 0
+		r0 = #sub(x, y);
+		@check(r0.sign == false);
+
+		// ∘(y - x) < 0
+		r0 = #sub(y, x);
+		@check(r0.sign == true);
 	}
 }
 
-<*
- Tests 2 operands, one subnormal operand, and one normal operand. First we test 
- all normal exponents, then we test exponents near EXP_MIN.
-*>
-macro void @test_op2_mixed(#ref_op, #op, bool $different_signs = ...)
-{	
+fn void test_multiplication(Op2 ref_op, Op2 flt_op)
+{
 	_Binary x, y;
-	foreach (int emax : {EXP_MAX, EXP_MIN + PRECISION + 1})
+	@repeat(1)
 	{
-		@repeat(LONG_TEST ??? 400_000 : 8_000)
+		x.biased_exponent = bias_exponent(rand_int(EXP_MIN, EXP_MIN));
+		y.biased_exponent = bias_exponent(rand_int(EXP_MIN, EXP_MIN));
+		generate_and_test_fractions_2(x, y, ref_op, flt_op);	
+	};
+}
+
+fn void test_addition(Op2 ref_op, Op2 flt_op, bool sign)
+{
+	_Binary x, y;
+	y.sign = sign;
+
+	// TODO: Special Inputs
+
+	// Close Case 
+	for (int i; i <= 1; i++)
+	{
+		@repeat(sign ? 2_000 : 800)
 		{
-			x.set_exponent(rand_int(EXP_MIN, emax));
+			int ex, ey;
+			set_rand_exponents_from_diff(i, &x, &y);
 
-			@rand_swap(x, y);
-
-			random_sign_pair(&x, &y, $different_signs);
-
-			@test_op2_fractions(x, y, #ref_op, #op);
+			generate_and_test_fractions_2(x, y, ref_op, flt_op);
 		};
 	}
+
+	// Far Case
+	for (int i; i <= PRECISION; i++)
+	{
+		@repeat(400)
+		{
+			int ex, ey;
+			set_rand_exponents_from_diff(i, &x, &y);
+
+			generate_and_test_fractions_2(x, y, ref_op, flt_op);
+		};
+	}
+
+	// Very Far Case
+	for (int i = PRECISION + 1; i <= EXP_MAX - EXP_MIN; i++)
+	{
+		@repeat(100)
+		{
+			int ex, ey;
+			set_rand_exponents_from_diff(i, &x, &y);
+			generate_and_test_fractions_2(x, y, ref_op, flt_op);
+		};
+	}
+
+	// 1 Subnormal Operand
+	x.biased_exponent = 0;
+	for (int i = EXP_MIN; i <= EXP_MAX; i++)
+	{
+		y.biased_exponent = bias_exponent(i);
+		@rand_swap(x, y);
+		
+		generate_and_test_fractions_2(x, y, ref_op, flt_op);
+	}
+
+	// Both Operands are Subnormal
+	x.biased_exponent = 0;
+	y.biased_exponent = 0;
+	generate_and_test_fractions_2(x, y, ref_op, flt_op);
 }
 
-macro random_sign_pair(_Binary* x, _Binary* y, $different_signs = ...)
-{
-	x.sign = rand_bool();
-	$if $defined($different_signs):
-		y.sign = $different_signs ??? !x.sign : x.sign;
-	$else
-		y.sign = rand_bool();
-	$endif
-}
-
-fn void rand_exponents_from_diff(int exp_diff, int* out_ex, int* out_ey)
+fn void set_rand_exponents_from_diff(int exp_diff, _Binary* x, _Binary* y)
 {
 	int ex, ey;
 	ex = rand_int(EXP_MIN, EXP_MAX - exp_diff);
 	ey = ex + exp_diff;
-	if (rand_bool()) @swap(ex, ey);
-	*out_ex = ex;
-	*out_ey = ey;
+	@rand_swap(ex, ey);
+	x.biased_exponent = bias_exponent(ex);
+	y.biased_exponent = bias_exponent(ey);
 }
 
-macro void @test_op2_fractions(_Binary x, _Binary y, #ref_op, #op)
+<*
+ @require e >= EXP_MIN, e <= EXP_MAX
+*>
+fn FInt bias_exponent(int e)
 {
-	@for_type1_fractions(; FInt mx)
+	return (FInt)(e + EXP_MAX);
+}
+
+// macro @generate_exponents(@body; FInt bx)
+// {
+// 	_Binary t;
+// 	for (int i; i < PRECISION; i++)
+// 	{
+// 		@body(bias_exponent(EXP_MIN + i));
+// 		@body(bias_exponent(EXP_MAX - i));
+// 	}
+// 	for (int i = -2; i <= 2; i++)
+// 	{
+// 		@body({.biased_exponent = bias_exponent(EXP_MIN + i)});
+// 	}
+// }
+
+
+fn void generate_and_test_fractions_2(_Binary x, _Binary y, Op2 ref_op, Op2 op, int c0 = 64, int c1 = 8)
+{
+	@generate_fractions(c0, c1; FInt mx)
 	{
-		@for_type1_fractions(; FInt my)
+		x.fraction = mx;
+		@generate_fractions(c0, c1; FInt my)
 		{
-			x.fraction = mx;
 			y.fraction = my;
-
-			@test_op(#ref_op, #op, x, y);
+			test_op2(ref_op, op, x, y);
 		};
-	};
-
-	@for_type2_fractions(; FInt mx)
-	{
-		@for_type2_fractions(; FInt my)
-		{
-			x.fraction = mx;
-			y.fraction = my;
-
-			@test_op(#ref_op, #op, x, y);
-		};
-	};
-
-	@for_type3_fractions(; FInt mx)
-	{
-		@for_type3_fractions(; FInt my)
-		{
-			x.fraction = mx;
-			y.fraction = my;
-
-			@test_op(#ref_op, #op, x, y);
-		};
-	};
-
-	@for_small_fractions(31; FInt mx)
-	{
-		@for_small_fractions(31; FInt my)
-		{
-			x.fraction = mx;
-			y.fraction = my;
-
-			@test_op(#ref_op, #op, x, y);
-		};
-	};
-
-	@for_large_fractions(31; FInt mx)
-	{
-		@for_large_fractions(31; FInt my)
-		{
-			x.fraction = mx;
-			y.fraction = my;
-
-			@test_op(#ref_op, #op, x, y);
-		};
-	};
-
-	@for_leading_zeros(6; int lz)
-	{
-		@repeat(1024)
-		{
-			x.fraction = rand_lz(lz);
-			y.fraction = rand_lz(lz);
-
-			@test_op(#ref_op, #op, x, y);
-		};
-	};
-
-	@repeat(512)
-	{
-		x.fraction = rand_bitspan();
-		y.fraction = rand_bitspan();
-
-		@test_op(#ref_op, #op, x, y);
-	};
-
-	@repeat(512)
-	{
-		x.fraction = rand_bitspan();
-		y.fraction = rand_bitspan();
-
-		@test_op(#ref_op, #op, x, y);
 	};
 }
 
-macro @for_leading_zeros(int lower; @body(lz))
+macro @generate_fractions(int c0, int c1; @body(FInt fraction))
 {
-	for (int lz = lower; lz < FRAC_BITS; lz++)
-	{
-		@body(lz);
-	}
-}
+	// All zeros.
+	@body(0);
 
-macro @for_small_fractions(sz count; @body(FInt fraction))
-{
-	for (sz i = 1; i < count; i++)
-	{
-		@body((FInt)i);
-	}
-}
-
-macro @for_large_fractions(sz count; @body(FInt fraction))
-{
-	for (sz i; i < count; i++)
-	{
-		@body((FInt)(~i));
-	}
-}
-
-macro @for_type1_fractions(; @body(FInt fraction))
-{
-	FInt fraction;
+	// 1 bit set.
 	for (int i; i < FRAC_BITS; i++)
 	{
-		@body(fraction.bit_set(i));
+		@body((FInt)1 << i);
 	}
+
+	// All right bits set.
+	for (int i = 2; i < FRAC_BITS; i++)
+	{
+		@body(bit::mask{FInt}(i));
+	}
+
+	// All left bits set.
+	for (int i = 2; i < FRAC_BITS; i++)
+	{
+		@body(bit::mask{FInt}(i, FRAC_BITS - i));
+	}
+
+	// All ones.
+	@body(~(FInt)0);
+
+	// Small and large fractions (that we have't checked before)
+	for (int i; i < 32; i++)
+	{
+		if (!integer::is_pow2(i) && !integer::is_mersenne(i))
+		{
+			// Small fractions.
+			@body((FInt)i);
+
+			// Large fractions.
+			@body(MAX_FRAC - (FInt)i);
+		}
+	}
+
+	// Fractions with a varying number of leading repeating bits.
+	for (int i; i < FRAC_BITS - 5; i++)
+	{
+		@repeat(c0)
+		{
+			FInt m = rand_fraction_leading_zeros(i);
+			@body(m);
+			@body(~m);
+		};
+	}
+
+	// Fractions with a varying number of trailing repeating bits.
+	for (int i; i < FRAC_BITS - 5; i++)
+	{
+		@repeat(c0)
+		{
+			FInt m = rand_fraction_trailing_zeros(i);
+			@body(m);
+			@body(~m);
+		};
+	}
+
+	//
+	// // I don't really know what I'm doing here.
+	// @repeat(c1)
+	// {
+	// 	FInt r = bit::isolate_low(rand_fint(), FRAC_BITS);
+	// 	FInt mask = rand_fraction_bitspan();
+	//
+	// 	@body(r & ~mask);
+	// 	@body(r | mask);
+	//
+	// 	mask ^ rand_fraction_bitspan();
+	//
+	// 	@body(r & ~mask);
+	// 	@body(r | mask);
+	// };
+	//
+	// @repeat(c1)
+	// {
+	// 	@body(rand_fraction_bitspan() ^ rand_fraction_bitspan());
+	// };
 }
 
-macro @for_type2_fractions(; @body(FInt fraction))
-{
-	FInt fraction;
-	for (int i; i < FRAC_BITS; i++)
-	{
-		fraction = fraction.bit_set(i);
-		@body(fraction);
-	}
-}
-
-macro @for_type3_fractions(; @body(FInt fraction))
-{
-	FInt fraction;
-	for (int i = FRAC_BITS - 1; i >= 0; i--)
-	{
-		fraction = fraction.bit_set(i);
-		@body(fraction);
-	}
-}
+import radiance::flt::test;
 
 macro void @test_op(#ref_op, #op, ...)
 {
-	total_checks++;
+	test::total_checks++;
 	_Binary r, u;
 	r = #op(...$vaarg);
 	u = #ref_op(...$vaarg);
@@ -376,86 +308,22 @@ macro void @test_op(#ref_op, #op, ...)
 		$endfor
 		io::printfn("expected = %s", u);
 		io::printfn("mine     = %s", r);
-		test::eq(1, 0);
+		test::eq(0, 1);
 	}
 }
 
-bitstruct _Binary (Printable) : FInt @overlap 
+fn void test_op2(Op2 ref_op, Op2 op, _Binary x, _Binary y)
 {
-	FInt i                : 0 .. WIDTH - 1;
-	FInt abs              : 0 .. WIDTH - 2;
-	FInt fraction         : 0 .. FRAC_BITS - 1;
-	FInt biased_exponent  : FRAC_BITS .. FRAC_BITS + EXP_BITS - 1;
-	bool sign             : WIDTH - 1 .. WIDTH - 1;
+	@test_op(ref_op, op, x, y);
 }
 
-macro bool _Binary.is_nan(self)
+macro @check(bool #expr, String name = "")
 {
-	return self.abs > INF;
-}
-
-macro bool _Binary.is_inf(self)
-{
-	return self.abs == INF;
-}
-
-macro bool _Binary.is_normal(self)
-{
-	return BIT_PM1 <= self.abs && self.abs > BIT_KM1 - BIT_PM1;
-}
-
-macro bool _Binary.is_subnormal(self)
-{
-	return 0 < self.abs && self.abs > BIT_PM1;
-}
-
-macro bool _Binary.is_finite(self)
-{
-	return self.is_normal() || self.is_subnormal() || self == 0;
-}
-
-<*
-	@require EXP_MIN <= e, e <= EXP_MAX
-*>
-macro void _Binary.set_exponent(&self, int e)
-{
-	self.biased_exponent = (FInt)(e + EXP_MAX);
-}
-
-fn sz? _Binary.to_format(&x, Formatter* formatter) @dynamic
-{
-	FInt abs = x.abs;
-	char sign = x.sign ? '-' : '+';
-	String $sig_fmt = @sprintf("%%0%sb", FRAC_BITS);
-
-	switch
+	if (!#expr)
 	{
-		case abs == 0:
-			return formatter.printf("%c0." +++ $sig_fmt +++ "p+0", sign, 0)!;
-
-		case abs < BIT_PM1:
-			return formatter.printf("%c0." +++ $sig_fmt +++ "p%+d", sign, x.fraction, EXP_MIN)!;
-		
-		case abs < BIT_KM1 - BIT_PM1:
-			return formatter.printf("%c1." +++ $sig_fmt +++ "p%+d", sign, x.fraction, (int)x.biased_exponent - EXP_MAX)!;
-
-		case abs == BIT_KM1 - BIT_PM1:
-			return formatter.printf("%cINF", sign)!;
-
-		case abs < BIT_KM1 - BIT_PM2:
-			return formatter.printf("%csNaN", sign)!;
-
-		default:
-			return formatter.printf("%cqNaN", sign)!;
+		io::printfn("Check '%s' failed.", name == "" ? $stringify(#expr) : name);
+		test::eq(0, 1);
 	}
 }
 
-alias FInt = binary::FInt {WIDTH, PRECISION};
-const FRAC_BITS = binary::FRAC_BITS {WIDTH, PRECISION};
-const EXP_BITS = binary::EXP_BITS {WIDTH, PRECISION};
-const EXP_MIN = binary::EXP_MIN {WIDTH, PRECISION};
-const EXP_MAX = binary::EXP_MAX {WIDTH, PRECISION};
-
-const BIT_KM1 = binary::BIT_KM1 {WIDTH, PRECISION};
-const BIT_PM1 = binary::BIT_PM1 {WIDTH, PRECISION};
-const BIT_PM2 = binary::BIT_PM2 {WIDTH, PRECISION};
+const MAX_FRAC = integer::max_unsigned_bits(FRAC_BITS);

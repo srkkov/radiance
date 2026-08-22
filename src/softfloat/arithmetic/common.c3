@@ -2,25 +2,28 @@ module radiance::flt::binary <WIDTH, PRECISION> @private;
 import radiance::integer @public, radiance::integer::bit @public;
 
 <*
- Extracts the *biased exponent* field of the absolute value of an ieee754 binary 
- floating point bitstring.
+ Extracts the biased exponent field.
 
- Example for binary32:
-
-	abs_x  = 0 eeeeeeee fffffffffffffffffffffff
-	return = 0 00000000 000000000000000eeeeeeee
-
- @require is_regular(abs_x)
- @ensure return < integer::max_unsigned_bits(EXP_BITS)
+ @require is_regular(abs_x) && !_sign(abs_x)
+ @ensure return <= integer::max_unsigned_bits(EXP_BITS) - 1
 *>
 macro FInt _biased_exponent(FInt abs_x)
 {
 	return abs_x >> FRAC_BITS;
 }
+// Notes:
+//
+//   EXP_MIN + EXP_MAX = 1
+//
+//   exponent = biased_exponent - EXP_MAX + is_subnormal
+//            = biased_exponent - EXP_MAX + 1 - is_normal
+//            = biased_exponent + EXP_MIN - is_normal
+//
+//   biased_exponent = exponent - EXP_MIN + is_normal
+
 
 <*
- Returns true if the given absolute value of an ieee754 binary 
- floating point is a normal number.
+ Returns true if abs_x is a normal number, false otherwise.
 
  @require is_regular(abs_x)
 *>
@@ -30,82 +33,154 @@ macro bool _normal_bit(FInt abs_x)
 }
 
 <*
- Packs all components of the resulting floating point number, excluding the sign,
- and simultaneously applies rounding.
+ Packs the significand and exponent into an ieee754-interchange encoding and applies rounding.
 
- --- Explanation ---
-
- Let `r` be the result floating point number of some scalar-valued operation.
- Let `e` be the exponent of the `r` in the unbounded domain.
- Let `u` be the truncated significand of `r`, and `f` be the truncated fraction of `r`.
-
- Let `d` be the biased value of `e` in the current floating point format.
- At this point overflow before rounding as been taken care of.
-
- --- Rounding ---
-
- Before rounding, our result looks like this:
-
-	0 dddddddd fffffffffffffffffffffff
-
- We can see that rounding can be applied simply by just adding the rounding bit to the result 
- as a `k-1` bit integer. An overflow of the fraction field will increment the exponent field 
- automatically, and in the case of *overflow after rounding*, where `e = EXP_MAX` and 
- `f = 1 << FRAC_BITS - 1`, it will automatically overflow into the representation of `INF`.
-
-	  0 11111110 11111111111111111111111    (largest normal)
-	+                                  1
-	------------------------------------
-	= 0 11111111 00000000000000000000000    (infinity)
-
- It's also the case that the largest subnormal number will automatically transition
- to the smallest normal number.
-
-	  0 00000000 11111111111111111111111    (largest subnormal)
-	+                                  1
-	------------------------------------
-	= 0 00000001 00000000000000000000000    (smallest normal)
-
- --- Packing ---
-
- Before rounding, we must pack the absolute value of the result:
-
- 	0 dddddddd fffffffffffffffffffffff 
-
- We must calulate the truncated fraction `f` of the result before applying rounding,
- but we commonly have the truncated significand `u` after the core computation, which 
- just has the hidden leading 1, `u = 1.ff...f`.
-
- Instead of removing the hidden bit, it's more efficient to calculate `d - 1`, and pack by 
- computing `(d - 1) << FRAC_BITS + u`. In the case of normal numbers the hidden 1 in `u` will
- just increment the `d - 1` field back to the value of `d`. In the case of subnormal numbers,
- we've clamped `d = 0` and `u` will not contain the hidden leading 1, thus `d` is unchanged.
-
- TODO: Write and point to the description of how we calculate `d - 1`.
-
- --- End ---
+ @param u : "Result truncated significand, may be subnormalized."
+ @param d : "Modified result exponent d = er - EXP_MIN = br - nr."
+ @param rounding : "Equal to 1 if we should compute the successor of u."
 
  @require u <= integer::max_unsigned_bits(PRECISION)
- @require dm1 <= integer::max_unsigned_bits(EXP_BITS) - 1
+ @require d <= integer::max_unsigned_bits(EXP_BITS) - 1
  @require rounding <= 1
+
+ @ensure !_sign(return), !is_nan(return)
 *>
-macro FInt _round_pack(FInt u, FInt dm1, FInt rounding)
+fn FInt _round_pack(FInt u, FInt d, FInt rounding) @inline
 {
-	return ((dm1 << FRAC_BITS) + u) + rounding;
+	// Parameters:
+	//  - u must equal the result truncated significand, correctly subnormalized if needed.
+	//  - rounding = 1 indicates that we should encode the successor of u instead.
+	//  - The value of d is equal to result_exponent - EXP_MIN, which is explained below.
+
+	// Let br and er be the result's biased and unbiased exponent respectively. Let nr be the
+	// is_normal bit of the result and let R be the integer encoding of the resulting floating point 
+	// number. Recall that
+	//
+	//   br = er - EXP_MIN + nr
+	//
+	// We are to encode with an implicit leading bit, and only store the fractional component of u.
+	// But we can avoid explictly removing the leading bit. First initialize the exponent field of R 
+	// to d = er - EXP_MIN,
+	// 
+	//   R = d << FRAC_BITS = 0 dddddddd 00000000000000000000000
+	//
+	// then add the raw integer value of the significand to R. This will simultaneously set the 
+	// fraction field and increment the exponent field by the leading bit, which is equal to nr 
+	// just as in the above equation for br.
+	//
+	//  R     = 0 dddddddd 00000000000000000000000
+	//  u     = 0 0000000n fffffffffffffffffffffff
+	//
+	//  R + u = 0 eeeeeeee fffffffffffffffffffffff
+	//
+	// If the result is subnormal, then er = EXP_MIN, thus d = 0. The significand will be less than
+	// than p-bits wide, thus d will not be incremented, which correctly encodes subnormal numbers.
+
+	// Rounding is then applied simply by adding the rounding bit to R. If the rounding bit
+	// is 1, then the successor is correctly computed. Even in the case where the fraction field
+	// overflows, the exponent field is incrementing correctly. Also note that if R = MAX_NORMAL,
+	// adding 1 correctly gives the encoding for INF again via overflow.
+
+	return ((d << FRAC_BITS) + u) + rounding;
+}
+
+<*
+ Packs the significand and exponent into an ieee754-interchange encoding, same as `_round_pack`
+ but without applying rounding
+*>
+fn FInt _pack(FInt u, FInt d) @inline
+{
+	return (d << FRAC_BITS) + u;
+}
+
+<*
+ Normalizes the significand without needed to extract the exponent. As a by-product, returns a 
+ value that can be used to calculate the result exponent
+
+ @param        abs_x
+ @param[&out]  out_mlz_x : "Modified number of significand leading zeros, mlz_x = lz_x + EXP_BITS."
+ @return                   "Normalized significand, justified to the left of the word."
+
+ @require[abs_x] is_regular(abs_x) && !_sign(abs_x)
+ @ensure *out_mlz_x <= K
+*>
+fn FInt _normalize(int* out_mlz_x, FInt abs_x) @inline
+{
+	// Two cases:
+	//  1. abs_x is normal, the exponent field is non-zero, therefore lzcnt(abs_x) <= EXP_BITS
+	//     and mlz = EXP_BITS. Shifting left by EXP_BITS leaves 1 bit after the fraction, and
+	//     we ensure that bit is set (the implicit bit).
+	//     
+	//  2. abs_x is subnormal, the exponent field is non-zero, thus lzcnt(abs_x) > EXP_BITS
+	//     and we directly shift the leading one of the fraction to the left.
+	//
+	// The value mlz_x can be used to calculate the number of significand leading zeros lz_x.
+	//
+	//   lz_x = mlz_x - EXP_BITS
+	//
+	// When abs_x is normal, mlz_x = EXP_BITS so lz_x = 0 as expected. When abs_x is subnormal,
+	// mlz_x = EXP_BITS + 1 + <number of leading zero fraction bits>. Notice that the +1 (from
+	// the sign field) accounts for the implicit bit being zero.
+
+
+	int mlz_x = integer::max(bit::lzcnt(abs_x), EXP_BITS);
+	*out_mlz_x = mlz_x;
+	return (abs_x << mlz_x) | SIGN_MASK;
+}
+
+<*
+ Splits the unbounded exponent if it is smaller than EXP_MIN.
+
+ @param[&out]  out_lz  : "The number of leading zeros that should be in the significand of the result."
+ @param        em      : "Modified unbounded exponent em = e - EXP_MIN."
+ @return                 "Modified result exponent d = er - EXP_MIN = br - nr."
+
+ @ensure *out_lz >= 0
+*>
+fn FInt _split_exponent(int* out_lz, int em)
+{
+	*out_lz = integer::max0(-em);
+	return (FInt)integer::max0(em);
+}
+
+<*
+ Returns true if the result exponent is out of systems exponent range.
+*>
+fn bool _exponent_overflow(FInt d)
+{
+	// Definite overflow if e > EXP_MAX. Since er = e when e >= EXP_MIN, we have
+	// d = er - EXP_MIN > EXP_MAX - EXP_MIN.
+
+	return d >= 2*EXP_MAX;
+}
+
+macro FInt _reduce_or(FInt high_r, int bits = ...)
+{
+	$if $defined(bits):
+		return (FInt)(high_r << (K - bits) != 0);
+	$else
+		return (FInt)(high_r != 0);
+	$endif
 }
 
 
-macro FInt _reduce_or(FInt self, int width = ...)
-{
-	return $defined(width) ???
-		bit::_trunc_reduce_or{FInt}(self, width) : bit::_reduce_or{FInt}(self);
-}
 
-alias _max = integer::max;
-alias _min = integer::min;
-alias _mul = integer::_umul{FInt};
-alias _mulhi = integer::_umulhi{FInt};
-alias _lzcnt = bit::_count_leading_zeros{FInt};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // =======================
@@ -119,8 +194,9 @@ alias _lzcnt = bit::_count_leading_zeros{FInt};
 macro bool _operands_not_within(FInt min, FInt max, ...)
 {
 	FInt[$vaarg.len] args;
+	FInt arg;
 	$for sz $i; $i < $vaarg.len; $i++:
-		FInt arg = $vaarg[$i];
+		arg = $vaarg[$i];
 		assert(arg & SIGN_MASK == 0);
 		args[$i] = arg - min;
 	$endfor
@@ -142,7 +218,6 @@ macro bool _special_or_subnormal_operands(...)
 // ========================
 // --- Rounding Helpers ---
 // ========================
-
 
 /* Meaning of round bit and sticky bit.
  

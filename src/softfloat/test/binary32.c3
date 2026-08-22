@@ -1,50 +1,59 @@
-module radiance::softfloat::test::binary32;
-import radiance::softfloat::binary;
+module radiance::flt::test @feat(TESTING);
+import radiance::flt::binary;
 
-macro _Binary32 my_add(_Binary32 x, _Binary32 y)
+long total_checks;
+
+fn void print_check_count() @finalizer
 {
-	_Binary32 r;
-	r.i = binary::add_rn{K,P}(x.i, y.i);
-	return r;
+	dump(total_checks);
 }
 
-alias ref_add = test::native_binary32_add_rn;
 
-fn void add_normal_operands() @test
+fn _Binary32 flt_binary32_add(_Binary32 x, _Binary32 y)
 {
-	@test_add_normal_close_case{K,P}(ref_add, my_add, false);
-	@test_add_normal_far_case_1{K,P}(ref_add, my_add, false);
-	@test_add_normal_far_case_2{K,P}(ref_add, my_add, false);
+	return {.i = binary::add2{K,P}(x.i, y.i, false)};
 }
 
-fn void add_mixed_operands() @test
+fn _Binary32 flt_binary32_sub(_Binary32 x, _Binary32 y)
 {
-	@test_op2_mixed{K,P}(ref_add, my_add, false);
+	return {.i = binary::add2{K,P}(x.i, y.i, true)};
 }
 
-fn void add_subnormal_operands() @test
+fn _Binary32 flt_binary32_mul(_Binary32 x, _Binary32 y)
 {
-	@test_op2_subnormal{K,P}(ref_add, my_add, false);
+	return {.i = binary::mul2{K,P}(x.i, y.i)};
 }
 
-fn void sub_normal_operands() @test
+alias ref_binary32_add = native_binary32_add;
+alias ref_binary32_mul = native_binary32_mul;
+
+fn void binary32_multiplication() @test
 {
-	@test_add_normal_close_case{K,P}(ref_add, my_add, true);
-	@test_add_normal_far_case_1{K,P}(ref_add, my_add, true);
-	@test_add_normal_far_case_2{K,P}(ref_add, my_add, true);
+	binary::test_multiplication{K,P}(&ref_binary32_mul, &flt_binary32_mul);
 }
 
-fn void sub_mixed_operands() @test
-{
-	@test_op2_mixed{K,P}(ref_add, my_add, true);
-}
+// fn void binary32_addition() @test
+// {
+// 	binary::test_addition{K,P}(&ref_binary32_add, &flt_binary32_add, false);
+// }
+//
+// fn void binary32_subtraction() @test
+// {
+// 	binary::test_addition{K,P}(&ref_binary32_add, &flt_binary32_add, true);
+// }
 
-fn void sub_subnormal_operands() @test
-{
-	@test_op2_subnormal{K,P}(ref_add, my_add, true);
-}
+// fn void binary32_addition_properties() @test
+// {
+// 	binary::test_addition_self{K,P}(flt_binary32_add, flt_binary32_sub);
+// }
 
-const K = 32;
-const P = 24;
+
+
+
+
+
+
+const K @local = 32;
+const P @local = 24;
 
 alias _Binary32 = _Binary{K,P};

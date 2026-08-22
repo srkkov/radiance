@@ -1,8 +1,6 @@
 module radiance::integer;
 import radiance::type;
 
-// This feels inefficent, can I do `std::core::radiance::type`?
-
 alias is_int        @private = type::is_int;
 alias is_signed     @private = type::is_signed;
 alias is_unsigned   @private = type::is_unsigned;

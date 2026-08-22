@@ -1,25 +1,23 @@
 module std::core::radiance;
 import std::io;
 
-macro void dump(...) @builtin
+macro void dump(#x) @builtin @safemacro
 {
-	$for sz $i; $i < $vaarg.len; $i++:
-		io::printf("%s: ", $stringify($vaarg[$i]));
+	io::printf("%s: ", $stringify(#x));
 
-		var result = $vaarg[$i];
-		$if $Typeof(result)::kind == OPTIONAL:
-			if (catch err = result)
-			{
-				io::printn(err);
-			}
-			else
-			{
-				io::printn(result);
-			}
-		$else
+	var result = #x;
+	$if $Typeof(result)::kind == OPTIONAL:
+		if (catch err = result)
+		{
+			io::printn(err);
+		}
+		else
+		{
 			io::printn(result);
-		$endif
-	$endfor
+		}
+	$else
+		io::printn(result);
+	$endif
 }
 
 macro @repeat(sz count; @body()) @builtin

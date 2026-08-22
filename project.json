@@ -8,6 +8,7 @@
 	"sanitize": "none",
 
 	"sources": [ 
+
 		"src/builtin/*",
 		"src/types/*",
 
@@ -17,7 +18,8 @@
 		"src/integer/**",
 		"src/vector/*",
 		"src/softfloat/*",
-		"src/softfloat/arithmetic",
+		"src/softfloat/arithmetic/*",
+		"src/softfloat/test/*",
 		"src/ap/**"
 	],
 
@@ -26,7 +28,9 @@
 			"sources": [ "main.c3" ],
 			"type": "executable",
 			"opt": "O0",
-			"safe": true
+			"safe": true,
+			"dependency-search-paths": [ "test/lib/" ],
+			"dependencies": [ "gmp", "mpfr" ]
 		},
 
 		"fast": {
@@ -40,9 +44,11 @@
 			"safe": false
 		},
 
-		"softfloat": {
+		"flt-test": {
 			"type": "test",
-			"sources": [ "src/softfloat/*" ],
+			"sources": [
+				"src/softfloat/*"
+			],
 			"test-sources": [ "src/softfloat/test/*" ],
 			"dependency-search-paths": [ "test/lib/" ],
 			"dependencies": [ "gmp", "mpfr" ]

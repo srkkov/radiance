@@ -1,93 +1,61 @@
-module radiance::softfloat::binary <WIDTH, PRECISION>;
+module radiance::flt::binary <WIDTH, PRECISION>;
 import radiance::integer;
 import std::io;
 
-macro FInt const_bitmask(int $width) => integer::const_bitmask(FInt, $width);
-
-alias FInt = integer::unsigned_from_bitsize(WIDTH);
-
-const int K   @private = WIDTH;
-const int KM1 @private = K - 1;
-const int KM2 @private = K - 2;
-const int P   @private = PRECISION;
-const int PM1 @private = P - 1;
-const int PM2 @private = P - 2;
-const FInt BIT_PM1 @private = (FInt)1 << PM1;
-const FInt BIT_PM2 @private = (FInt)1 << PM2;
-const FInt BIT_KM1 @private = (FInt)1 << KM1;
-
-const int EXP_BITS  = WIDTH - PRECISION;
-const int FRAC_BITS = PRECISION - 1;
-const int EXP_MAX   = (1 << (EXP_BITS - 1)) - 1;
-const int EXP_MIN   = 1 - EXP_MAX;
-const int BIAS      = EXP_MAX;
-
-const FInt SIGN_MASK = BIT_KM1;
-const FInt FRAC_MASK = const_bitmask(FRAC_BITS);
-
-const FInt INF = BIT_KM1 - BIT_PM1;
-const FInt QNAN = BIT_KM1 - BIT_PM2;
-
-const FInt MIN_SUBNORMAL = 1;
-const FInt MAX_SUBNORMAL = BIT_PM1 - 1;
-const FInt MIN_NORMAL = BIT_PM1;
-const FInt MAX_NORMAL = BIT_KM1 - BIT_PM1 - 1;
-
-macro FInt abs(FInt x) => x & ~SIGN_MASK;
-
-macro bool sign(FInt x) => !!(x & SIGN_MASK);
-
-<* @require !sign(x) *>
-macro bool is_zero_abs(FInt x) => !x;
-
-<* @require !sign(x) *>
-macro bool is_subnormal_abs(FInt x) => 0 < x && x < BIT_PM1;
-
-<* @require !sign(x) *>
-macro bool is_normal_abs(FInt x) => BIT_PM1 <= x && x < BIT_KM1 - BIT_PM1;
-
-<* @require !sign(x) *>
-macro bool is_finite_abs(FInt x) => x < INF;
-
-<* @require !sign(x) *>
-macro bool is_regular_abs(FInt x) => 0 < x && x < INF;
-
-<* @require !sign(x) *>
-macro bool is_inf_abs(FInt x) => x == INF;
-
-<* @require !sign(x) *>
-macro bool is_nan_abs(FInt x) => x > INF;
-
-<* @require !sign(x) *>
-macro bool is_snan_abs(FInt x) => INF < x && x < QNAN;
-
-<* @require !sign(x) *>
-macro bool is_qnan_abs(FInt x) => x >= QNAN;
-
-macro bool is_zero       (FInt x) => is_zero_abs       (abs(x));
-macro bool is_subnormal  (FInt x) => is_subnormal_abs  (abs(x));
-macro bool is_normal     (FInt x) => is_normal_abs     (abs(x));
-macro bool is_finite     (FInt x) => is_finite_abs     (abs(x));
-macro bool is_regular    (FInt x) => is_regular_abs    (abs(x));
-macro bool is_inf        (FInt x) => is_inf_abs        (abs(x));
-macro bool is_nan        (FInt x) => is_nan_abs        (abs(x));
-macro bool is_snan       (FInt x) => is_snan_abs       (abs(x));
-macro bool is_qnan       (FInt x) => is_qnan_abs       (abs(x));
-
-<*
- @require is_nan(x)
-*>
-macro bool is_signalling(FInt x)
+bitstruct _Binary (Printable) : FInt @overlap 
 {
-	return x < QNAN;
+	FInt i                : 0 .. WIDTH - 1;
+	FInt abs              : 0 .. WIDTH - 2;
+	FInt fraction         : 0 .. FRAC_BITS - 1;
+	FInt biased_exponent  : FRAC_BITS .. FRAC_BITS + EXP_BITS - 1;
+	bool sign             : WIDTH - 1 .. WIDTH - 1;
+}
+
+macro bool _Binary.is_nan(self) => is_nan(self.i);
+macro bool _Binary.is_inf(self) => is_inf(self.i);
+macro bool _Binary.is_normal(self) => is_normal(self.i);
+macro bool _Binary.is_subnormal(self) => is_subnormal(self.i);
+macro bool _Binary.is_finite(self) => is_finite(self.i);
+
+macro void _Binary.negate(&self)
+{
+	self.sign = !self.sign;
 }
 
 <*
- @require is_nan(x)
+ @require EXP_MIN <= e, e <= EXP_MAX
 *>
-macro FInt get_payload(FInt x)
+macro void _Binary.set_exponent(&self, int e)
 {
-	return x & const_bitmask(FRAC_BITS - 2);
+	self.biased_exponent = (FInt)(e + EXP_MAX);
+}
+
+fn sz? _Binary.to_format(&x, Formatter* formatter) @dynamic
+{
+	FInt abs = x.abs;
+	char sign = x.sign ? '-' : '+';
+	String $sig_fmt = @sprintf("%%0%sb", FRAC_BITS);
+
+	switch
+	{
+		case abs == 0:
+			return formatter.printf("%c0." +++ $sig_fmt +++ "p+0", sign, 0)!;
+
+		case abs < BIT_PM1:
+			return formatter.printf("%c0." +++ $sig_fmt +++ "p%+d", sign, x.fraction, EXP_MIN)!;
+		
+		case abs < BIT_KM1 - BIT_PM1:
+			return formatter.printf("%c1." +++ $sig_fmt +++ "p%+d", sign, x.fraction, (int)x.biased_exponent - EXP_MAX)!;
+
+		case abs == BIT_KM1 - BIT_PM1:
+			return formatter.printf("%cINF", sign)!;
+
+		case abs < BIT_KM1 - BIT_PM2:
+			return formatter.printf("%csNaN", sign)!;
+
+		default:
+			return formatter.printf("%cqNaN", sign)!;
+	}
 }
 
 
