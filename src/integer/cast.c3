@@ -1,40 +1,39 @@
 <*
- @require is_int(ToInteger)
+ @require is_int(Integer)
 *>
-module radiance::integer <ToInteger>;
+module radiance::integer <Integer>;
 
 <*
  @require @is_int(x)
 *>
-macro bool is_exact_cast(x)
+macro bool will_cast_exactly(x)
 {
-	return _is_exact_cast{ToInteger, $Typeof(x)}(x);
+	return _is_exact_cast{Integer, $Typeof(x)}(x);
 }
 
 <*
  @require @is_int(x)
  @return? OUT_OF_RANGE
 *>
-macro ToInteger? try_cast(x)
+macro Integer? try_cast(x)
 {
-	return _try_cast{ToInteger, $Typeof(x)}(x);
+	return _try_cast{Integer, $Typeof(x)}(x);
 }
 
 <*
  @require @is_int(x)
 *>
-macro ToInteger exact_cast(x)
+macro Integer exact_cast(x)
 {
-	return _try_cast{ToInteger, $Typeof(x)}(x)!!;
+	return _try_cast{Integer, $Typeof(x)}(x)!!;
 }
 
 <*
  @require @is_int(x)
- @return? OUT_OF_RANGE
 *>
-macro ToInteger saturating_cast(x)
+macro Integer saturating_cast(x)
 {
-	return _saturating_cast{ToInteger, $Typeof(x)}(x);
+	return _saturating_cast{Integer, $Typeof(x)}(x);
 }
 
 <*
@@ -53,7 +52,7 @@ const int FROM_SIZE = bitsize(FromInteger);
 const Integer MIN = Integer::min;
 const Integer MAX = Integer::max;
 
-macro bool _is_inexact_cast(FromInteger x)
+macro bool _will_cast_inexactly(FromInteger x)
 {
 	$switch:
 		$case UNSIGNED_TO_UNSIGNED:
@@ -70,14 +69,14 @@ macro bool _is_inexact_cast(FromInteger x)
 	$endswitch
 }
 
-macro bool _is_exact_cast(FromInteger x) => !_is_inexact_cast(x);
+macro bool _will_cast_exactly(FromInteger x) => !_will_cast_inexactly(x);
 
 <*
  @return? OUT_OF_RANGE
 *>
 fn Integer? _try_cast(FromInteger x)
 {
-	if (_is_inexact_cast(x))
+	if (_will_cast_inexactly(x))
 	{
 		return OUT_OF_RANGE~;
 	}

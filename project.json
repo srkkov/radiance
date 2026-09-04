@@ -8,18 +8,22 @@
 	"sanitize": "none",
 
 	"sources": [ 
+		
+		"test/test.c3",
+		"test/random.c3",
+		"test/runner.c3",
 
 		"src/builtin/*",
 		"src/types/*",
 
-		"src/env.c3",
-		"src/rounding.c3",
 
 		"src/integer/**",
 		"src/vector/*",
-		"src/softfloat/*",
-		"src/softfloat/arithmetic/*",
-		"src/softfloat/test/*",
+
+		"src/flt/*",
+		"src/flt/arithmetic/*",
+		"src/flt/test/*",
+
 		"src/ap/**"
 	],
 
@@ -47,9 +51,9 @@
 		"flt-test": {
 			"type": "test",
 			"sources": [
-				"src/softfloat/*"
+				"src/flt/*"
 			],
-			"test-sources": [ "src/softfloat/test/*" ],
+			"test-sources": [ "src/flt/test/*" ],
 			"dependency-search-paths": [ "test/lib/" ],
 			"dependencies": [ "gmp", "mpfr" ]
 		}

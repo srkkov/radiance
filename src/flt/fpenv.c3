@@ -11,15 +11,6 @@ struct FltEnv
 	bool              underflow_after_rounding;
 }
 
-enum FltRoundingMode : char
-{
-	NEAREST_EVEN,
-	TO_ZERO,
-	UP,
-	DOWN,
-	NEAREST_ODD,
-}
-
 enum FltException : char
 {
 	<*

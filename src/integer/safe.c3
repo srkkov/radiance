@@ -22,7 +22,7 @@ fn Integer? _try_abs(Integer x)
 <*
  @return? OUT_OF_RANGE
 *>
-fn Integer? _try_neg(Integer x)
+fn Integer? _try_neg(Integer x) @if(SIGNED)
 {
 	if (x == Integer::min) return OUT_OF_RANGE~;
 	return -x;
@@ -58,17 +58,17 @@ fn Integer? _try_mul(Integer x, Integer y)
 	return r;
 }
 
-// <*
-//  @return? DIVISION_BY_ZERO, OUT_OF_RANGE
-// *>
-// fn Integer? _try_div(Integer x, Integer y)
-// {
-// 	if (!y) return DIVISION_BY_ZERO~;
-// 	$if SIGNED:
-// 		if (x == Integer::min && y == -1) return OUT_OF_RANGE~;
-// 	$endif
-// 	return x / y;
-// }
+<*
+ @return? DIVISION_BY_ZERO, OUT_OF_RANGE
+*>
+fn Integer? _try_div(Integer x, Integer y)
+{
+	if (!y) return DIVISION_BY_ZERO~;
+	$if SIGNED:
+		if (x == Integer::min && y == -1) return OUT_OF_RANGE~;
+	$endif
+	return x / y;
+}
 
 module radiance::integer;
 

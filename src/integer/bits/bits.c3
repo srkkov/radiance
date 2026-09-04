@@ -214,9 +214,6 @@ fn Unsigned _deposit_byte(Unsigned x, char value, int index) @inline
 
 
 
-
-
-
 fn Unsigned _isolate_lowest_setbit(Unsigned x) @inline
 {
 	return x & -x;
@@ -287,7 +284,7 @@ fn int _tzcnt(Unsigned x)
 <*
  @require[amount] amount >= 0, amount < K
 *>
-fn Unsigned _funnel_shift_left(Unsigned x, Unsigned y, int amount)
+fn Unsigned _funnel_shl(Unsigned x, Unsigned y, int amount)
 {
 	return Unsigned.fshl(x, y, (Unsigned)amount);
 }
@@ -295,7 +292,7 @@ fn Unsigned _funnel_shift_left(Unsigned x, Unsigned y, int amount)
 <*
  @require[amount] amount >= 0, amount < K
 *>
-fn Unsigned _funnel_shift_right(Unsigned x, Unsigned y, int amount)
+fn Unsigned _funnel_shr(Unsigned x, Unsigned y, int amount)
 {
 	return Unsigned.fshr(x, y, (Unsigned)amount);
 }
@@ -303,7 +300,7 @@ fn Unsigned _funnel_shift_right(Unsigned x, Unsigned y, int amount)
 <*
  @require[amount] amount >= 0, amount < K
 *>
-fn Unsigned _rotate_left(Unsigned x, int amount)
+fn Unsigned _rol(Unsigned x, int amount)
 {
 	return Unsigned.rotl(x, (Unsigned)amount);
 }
@@ -311,14 +308,14 @@ fn Unsigned _rotate_left(Unsigned x, int amount)
 <*
  @require[amount] amount >= 0, amount < K
 *>
-fn Unsigned _rotate_right(Unsigned x, int amount)
+fn Unsigned _ror(Unsigned x, int amount)
 {
 	return Unsigned.rotr(x, (Unsigned)amount);
 }
 
 import std::bits;
 
-fn Unsigned _reversebits(Unsigned x) @inline
+fn Unsigned _reverse_bits(Unsigned x) @inline
 {
 	return std::bits::reverse(x);
 }

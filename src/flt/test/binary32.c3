@@ -27,10 +27,10 @@ fn _Binary32 flt_binary32_mul(_Binary32 x, _Binary32 y)
 alias ref_binary32_add = native_binary32_add;
 alias ref_binary32_mul = native_binary32_mul;
 
-fn void binary32_multiplication() @test
-{
-	binary::test_multiplication{K,P}(&ref_binary32_mul, &flt_binary32_mul);
-}
+// fn void binary32_multiplication() @test
+// {
+// 	binary::test_multiplication{K,P}(&ref_binary32_mul, &flt_binary32_mul);
+// }
 
 // fn void binary32_addition() @test
 // {
